@@ -12,10 +12,10 @@ router.get('/', (req, res) => {
 // Rota para criação de conta
 router.post('/create-account', async (req, res) => {
     try {
-        const { email, password, areaOfExpertise } = req.body;
+        const { email, password, userType } = req.body;
 
         // Verifica se todos os campos obrigatórios estão presentes
-        if (!email || !password || !areaOfExpertise) {
+        if (!email || !password || !userType) {
             return res.status(400).json({ message: 'Email, senha e área de formação são obrigatórios.' });
         }
 
@@ -29,7 +29,7 @@ router.post('/create-account', async (req, res) => {
         const user = new User({
             email,
             password, // Certifique-se de hashear a senha antes de salvar
-            areaOfExpertise,
+            userType,
         });
 
         await user.save();

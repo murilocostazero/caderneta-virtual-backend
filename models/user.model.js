@@ -33,10 +33,6 @@ const userSchema = new Schema({
 		type: Date,
 		default: Date.now
 	},
-	schoolId: {
-		type: Schema.Types.ObjectId,
-		ref: 'School',
-	},
 	userType: {
 		type: String,
 		enum: ['manager', 'teacher'],
