@@ -69,23 +69,27 @@ router.post('/login', async (req, res) => {
         return res.status(400).json({ message: 'Usuário não encontrado' });
     }
 
-    if (userInfo.email == email && userInfo.password == password) {
-        const user = { user: userInfo };
-        const accessToken = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
-            expiresIn: '36000m'
-        });
-
-        return res.json({
-            error: false,
-            message: 'Login completo',
-            email,
-            accessToken
-        });
-    } else {
-        return res.json({
-            error: true,
-            message: 'Credenciais inválidas'
-        });
+    try {
+        if (userInfo.email == email && userInfo.password == password) {
+            const user = { user: userInfo };
+            const accessToken = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+                expiresIn: '36000m'
+            });
+    
+            return res.json({
+                error: false,
+                message: 'Login completo',
+                email,
+                accessToken
+            });
+        } else {
+            return res.json({
+                error: true,
+                message: 'Credenciais inválidas'
+            });
+        }
+    } catch (error){
+        console.log('Login Error: ',error)
     }
 });
 
