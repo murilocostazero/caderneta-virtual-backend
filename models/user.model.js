@@ -43,6 +43,7 @@ const userSchema = new Schema({
 		type: Schema.Types.ObjectId,
 		ref: 'School',
 	},
+	subjects: [{ type: Schema.Types.ObjectId, ref: 'SchoolSubject' }],
 });
 
 module.exports = mongoose.model('User', userSchema);
