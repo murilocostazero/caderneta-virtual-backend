@@ -1,6 +1,7 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const User = require('../models/user.model');
+const School = require('../models/school.model');
 const { authenticateToken } = require('../utilities');
 const router = express.Router();
 
@@ -173,6 +174,48 @@ router.put('/update-last-school/:id', authenticateToken, async (req, res) => {
         res.status(500).json({ message: 'Erro ao atualizar a escola selecionada.' });
     }
 });
+
+router.delete('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Tenta encontrar e deletar o usuário
+        const user = await User.findByIdAndDelete(id);
+
+        if (!user) {
+            return res.status(404).json({ message: 'Usuário não encontrado.' });
+        }
+
+        res.status(200).json({ message: 'Usuário excluído com sucesso.' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Erro ao excluir usuário.' });
+    }
+});
+
+// Rota para remover um professor do array de professores de uma escola
+router.put('/remove-teacher/:schoolId/:teacherId', async (req, res) => {
+    try {
+        const { schoolId, teacherId } = req.params;
+
+        // Encontra a escola pelo ID e remove o professor do array de teachers
+        const school = await School.findByIdAndUpdate(
+            schoolId,
+            { $pull: { teachers: teacherId } }, // Usa $pull para remover o professor
+            { new: true }
+        );
+
+        if (!school) {
+            return res.status(404).json({ message: 'Escola não encontrada.' });
+        }
+
+        res.status(200).json({ message: 'Professor removido com sucesso.', school });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Erro ao remover professor da escola.' });
+    }
+});
+
 
 
 
