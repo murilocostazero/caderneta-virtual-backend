@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const Classroom = require('../models/classroom.model'); // Importa o modelo da turma
+const { authenticateToken } = require('../utilities');
 
-router.get('/:id', async (req, res) => {
+router.get('/:id', authenticateToken, async (req, res) => {
     try {
         const classroomData = await Classroom.findById(req.params.id).populate('school');
         if (!classroomData) {
@@ -15,7 +16,7 @@ router.get('/:id', async (req, res) => {
     }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', authenticateToken, async (req, res) => {
     try {
         const { grade, name, shift, school } = req.body;
         const newClassroom = new Classroom({ grade, name, shift, school });
@@ -27,7 +28,7 @@ router.post('/', async (req, res) => {
     }
 });
 
-router.put('/:id', async (req, res) => {
+router.put('/:id', authenticateToken, async (req, res) => {
     try {
         const { grade, name, shift } = req.body;
         const updatedClassroom = await Classroom.findByIdAndUpdate(
@@ -45,7 +46,7 @@ router.put('/:id', async (req, res) => {
     }
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authenticateToken, async (req, res) => {
     try {
         const classroomData = await Classroom.findById(req.params.id);
         if (!classroomData) {
@@ -64,7 +65,7 @@ router.delete('/:id', async (req, res) => {
     }
 });
 
-router.get('/:schoolId/classes', async (req, res) => {
+router.get('/:schoolId/classes', authenticateToken, async (req, res) => {
     try {
         const classes = await Classroom.find({ school: req.params.schoolId });
         res.status(200).json(classes);
