@@ -20,6 +20,7 @@ const schoolRoute = require('./routes/school.route');
 const schoolSubject = require('./routes/schoolSubject.route');
 const classroom = require('./routes/classroom.route');
 const student = require('./routes/student.route');
+const gradebook = require('./routes/gradebook.route');
 
 // Usar as rotas
 app.use('/', userRoute);
@@ -27,6 +28,7 @@ app.use('/school', schoolRoute);
 app.use('/subject', schoolSubject);
 app.use('/classroom', classroom);
 app.use('/student', student);
+app.use('/gradebook', gradebook);
 
 // Iniciar o servidor
 app.listen(8000, () => {

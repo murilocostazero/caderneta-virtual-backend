@@ -8,7 +8,7 @@ const { default: mongoose } = require('mongoose');
 // 1. Rota que busca todos os alunos de uma turma
 router.get('/classrooms/:classroomId', authenticateToken, async (req, res) => {
     try {
-        const students = await Student.find({ classroom: req.params.classroomId });
+        const students = await Student.find({ classroom: req.params.classroomId }).sort({ name: 1 });
         res.status(200).json(students);
 
     } catch (error) {

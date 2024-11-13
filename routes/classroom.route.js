@@ -67,7 +67,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
 
 router.get('/:schoolId/classes', authenticateToken, async (req, res) => {
     try {
-        const classes = await Classroom.find({ school: req.params.schoolId });
+        const classes = await Classroom.find({ school: req.params.schoolId }).sort({ grade: 1, name: 1 });
         res.status(200).json(classes);
     } catch (error) {
         console.error(error);
