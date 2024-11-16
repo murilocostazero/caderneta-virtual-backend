@@ -1,16 +1,22 @@
 const express = require('express');
 const router = express.Router();
 const Gradebook = require('../models/gradebook.model');
-const { authenticateToken } = require('../utilities'); 
+const { authenticateToken } = require('../utilities');
 
 // 1. Rota que busca um gradebook por ID
 router.get('/:id', authenticateToken, async (req, res) => {
     try {
-        const gradebook = await Gradebook.findById(req.params.id);
+        const gradebook = await Gradebook.findById(req.params.id)
+            .populate('teacher', 'name') // Preenche o campo 'professor' com o nome do professor
+            .populate('subject', 'name')   // Preenche o campo 'subject' com o nome da matéria
+            .populate('classroom', 'grade name shift') // Preenche o campo 'classroom' com o nome da turma
+            .populate('school', '_id');  // Opcional, preenche o campo 'school' com o ID da escola (se necessário)
+
         if (!gradebook) {
             return res.status(404).json({ message: "Gradebook not found" });
         }
-        res.json(gradebook);
+
+        res.status(200).json(gradebook);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -45,10 +51,10 @@ router.get('/school/:schoolId', authenticateToken, async (req, res) => {
 
 // 4. Rota que adiciona um novo gradebook
 router.post('/', authenticateToken, async (req, res) => {
-    const { year, school, classroom, teacher, subject } = req.body;
+    const { academicYear, school, classroom, teacher, subject } = req.body;
 
     const newGradebook = new Gradebook({
-        year,
+        academicYear,
         school,
         classroom,
         teacher,
@@ -65,21 +71,92 @@ router.post('/', authenticateToken, async (req, res) => {
 
 // 5. Rota que altera os dados do gradebook
 router.put('/:id', authenticateToken, async (req, res) => {
-    const { year, skill, school, classroom, teacher, subject } = req.body;
+    const { academicYear, skill, school, classroom, teacher, subject } = req.body;
 
     try {
         const updatedGradebook = await Gradebook.findByIdAndUpdate(
             req.params.id,
-            { year, skill, school, classroom, teacher, subject },
+            { academicYear, skill, school, classroom, teacher, subject },
             { new: true }
         );
         if (!updatedGradebook) {
             return res.status(404).json({ message: "Gradebook not found" });
         }
-        res.json(updatedGradebook);
+        res.status(200).json(updatedGradebook);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
 });
+
+// 6. Adicionar um novo TermSchema
+router.post('/:gradebookId/term', authenticateToken, async (req, res) => {
+    try {
+        const { gradebookId } = req.params;
+        const { name, startDate, endDate } = req.body;
+
+        const gradebook = await Gradebook.findById(gradebookId)
+        .populate('teacher', 'name') 
+        .populate('subject', 'name')   
+        .populate('classroom', 'grade name shift') 
+        .populate('school', '_id');  
+        
+        if (!gradebook) {
+            return res.status(404).json({ message: "Gradebook não encontrado" });
+        }
+
+        // Criação do novo TermSchema
+        const newTerm = {
+            name,
+            startDate,
+            endDate,
+            lessons: [],
+            studentEvaluations: []
+        };
+
+        // Adicionar o novo Term ao gradebook
+        gradebook.terms.push(newTerm);
+        await gradebook.save();
+
+        res.status(201).json({ message: "Bimestre adicionado com sucesso!", gradebook });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// 7. Atualizar um TermSchema existente
+router.put('/:gradebookId/term/:termId', authenticateToken, async (req, res) => {
+    try {
+        const { gradebookId, termId } = req.params;
+        const { name, startDate, endDate } = req.body;
+
+        const gradebook = await Gradebook.findById(gradebookId)
+        .populate('teacher', 'name') 
+        .populate('subject', 'name')   
+        .populate('classroom', 'grade name shift') 
+        .populate('school', '_id');  
+
+        if (!gradebook) {
+            return res.status(404).json({ message: "Gradebook não encontrado" });
+        }
+
+        // Encontrar o Term pelo ID
+        const term = gradebook.terms.id(termId);
+        if (!term) {
+            return res.status(404).json({ message: "Bimestre não encontrado" });
+        }
+
+        // Atualizar os dados do Term
+        if (name) term.name = name;
+        if (startDate) term.startDate = startDate;
+        if (endDate) term.endDate = endDate;
+
+        await gradebook.save();
+
+        res.status(200).json({ message: "Bimestre atualizado com sucesso!", gradebook });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
 
 module.exports = router;

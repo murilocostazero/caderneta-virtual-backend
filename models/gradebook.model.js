@@ -22,6 +22,7 @@ const StudentEvaluationSchema = new Schema({
 });
 
 const TermSchema = new Schema({
+    name: {type: String},
     startDate: { type: Date, required: true }, // Data de início
     endDate: { type: Date, required: true }, // Data de término
     lessons: [LessonSchema],
@@ -35,10 +36,7 @@ const GradebookSchema = new Schema({
     classroom: { type: Schema.Types.ObjectId, ref: 'Classroom', required: true },
     teacher: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     school: { type: Schema.Types.ObjectId, ref: 'School', required: true },
-    term1: TermSchema,
-    term2: TermSchema,
-    term3: TermSchema,
-    term4: TermSchema
+    terms: [TermSchema]
 }, {
     timestamps: true
 });
