@@ -1,13 +1,15 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
+const AttendanceSchema = new mongoose.Schema({
+    studentId: { type: Schema.Types.ObjectId, ref: 'Student', required: true },
+    present: { type: Boolean, default: true },
+});
+
 const LessonSchema = new Schema({
     topic: String,
     date: Date,
-    attendance: [{
-        student: { type: Schema.Types.ObjectId, ref: 'Student' },
-        present: Boolean
-    }]
+    attendance: [AttendanceSchema]
 });
 
 const StudentEvaluationSchema = new Schema({

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Gradebook = require('../models/gradebook.model');
+const Student = require('../models/student.model');
 const { authenticateToken } = require('../utilities');
 
 // 1. Rota que busca um gradebook por ID
@@ -238,7 +239,7 @@ router.delete('/:gradebookId/term/:termId/lesson/:lessonId', authenticateToken, 
 
         const term = gradebook.terms.id(req.params.termId);
         if (!term) {
-            return res.status(404).json({ message: 'Term not found.'});
+            return res.status(404).json({ message: 'Term not found.' });
         }
 
         const lesson = term.lessons.id(req.params.lessonId);
@@ -249,7 +250,116 @@ router.delete('/:gradebookId/term/:termId/lesson/:lessonId', authenticateToken, 
         lesson.remove();
         await gradebook.save();
 
-        res.status(200).json({ message: 'Lesson deleted successfully.'});
+        res.status(200).json({ message: 'Lesson deleted successfully.' });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+//Rota para criar uma chamada
+router.post('/:gradebookId/term/:termId/lesson/:lessonId/attendance', authenticateToken, async (req, res) => {
+    const { attendance } = req.body; // Array de { studentId, present }
+
+    try {
+        const gradebook = await Gradebook.findById(req.params.gradebookId)
+            .populate('teacher', 'name') // Preenche o campo 'professor' com o nome do professor
+            .populate('subject', 'name')   // Preenche o campo 'subject' com o nome da matéria
+            .populate('classroom', 'grade name shift') // Preenche o campo 'classroom' com o nome da turma
+            .populate('school', '_id');  // Opcional, preenche o campo 'school' com o ID da escola (se necessário)
+
+        if (!gradebook) {
+            return res.status(404).json({ message: 'Caderneta não encontrada' });
+        }
+
+        const term = gradebook.terms.id(req.params.termId);
+        if (!term) {
+            return res.status(404).json({ message: 'Bimestre não encontrado' });
+        }
+
+        const lesson = term.lessons.id(req.params.lessonId);
+        if (!lesson) {
+            return res.status(404).json({ message: 'Aula não encontrada' });
+        }
+
+        if (lesson.attendance && lesson.attendance.length > 0) {
+            return res.status(400).json({ message: 'Já existe uma chamada para essa aula' });
+        }
+
+        lesson.attendance = attendance; // Adiciona a chamada
+        await gradebook.save();
+
+        res.status(201).json({ message: 'Chamada criada com sucesso', gradebook });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// Rota para editar uma chamada
+router.put('/:gradebookId/term/:termId/lesson/:lessonId/attendance', authenticateToken, async (req, res) => {
+    const { attendance } = req.body; // Array atualizado
+
+    try {
+        const gradebook = await Gradebook.findById(req.params.gradebookId)
+            .populate('teacher', 'name') // Preenche o campo 'professor' com o nome do professor
+            .populate('subject', 'name')   // Preenche o campo 'subject' com o nome da matéria
+            .populate('classroom', 'grade name shift') // Preenche o campo 'classroom' com o nome da turma
+            .populate('school', '_id')  // Opcional, preenche o campo 'school' com o ID da escola (se necessário)
+            .sort({ 'classroom.grade': 1, 'classroom.name': 1 });
+
+        if (!gradebook) {
+            return res.status(404).json({ message: 'Gradebook not found.' });
+        }
+
+        const term = gradebook.terms.id(req.params.termId);
+        if (!term) {
+            return res.status(404).json({ message: 'Term not found.' });
+        }
+
+        const lesson = term.lessons.id(req.params.lessonId);
+        if (!lesson) {
+            return res.status(404).json({ message: 'Lesson not found.' });
+        }
+
+        lesson.attendance = attendance; // Atualiza a chamada
+        await gradebook.save();
+
+        res.status(200).json({ message: 'Attendance updated successfully.', gradebook });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// Rota que busca uma chamada
+router.get('/:gradebookId/term/:termId/lesson/:lessonId/attendance', authenticateToken, async (req, res) => {
+    try {
+        const gradebook = await Gradebook.findById(req.params.gradebookId)
+            .populate({
+                path: 'terms.lessons.attendance.studentId',
+                select: 'name', // Popula apenas o nome do aluno
+                options: { strictPopulate: false }, // Desativa o strictPopulate
+            });
+
+        if (!gradebook) {
+            return res.status(404).json({ message: 'Gradebook not found.' });
+        }
+
+        const term = gradebook.terms.id(req.params.termId);
+        if (!term) {
+            return res.status(404).json({ message: 'Term not found.' });
+        }
+
+        const lesson = term.lessons.id(req.params.lessonId);
+        if (!lesson) {
+            return res.status(404).json({ message: 'Lesson not found.' });
+        }
+
+        res.status(200).json({
+            lesson: {
+                topic: lesson.topic,
+                date: lesson.date,
+                attendance: lesson.attendance,
+            },
+        });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
