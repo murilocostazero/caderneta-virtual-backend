@@ -378,7 +378,7 @@ router.get('/:gradebookId/term/:termId/evaluations', authenticateToken, async (r
                 path: 'classroom',
                 populate: {
                     path: 'students',
-                    select: 'name', // Popula apenas o nome dos alunos
+                    select: 'name cpf _id', // Popula apenas o nome dos alunos
                     strictPopulate: false, // Adicionando a opção para evitar o erro
                 },
             })
@@ -409,7 +409,11 @@ router.get('/:gradebookId/term/:termId/evaluations', authenticateToken, async (r
         const evaluations = students.map((student) => {
             const evaluation = evaluationsMap.get(student._id.toString()) || {};
             return {
-                student: student.name,
+                student: {
+                    name: student.name,
+                    _id: student._id,
+                    cpf: student.cpf
+                },
                 monthlyExam: evaluation.monthlyExam || 0,
                 bimonthlyExam: evaluation.bimonthlyExam || 0,
                 qualitativeAssessment: evaluation.qualitativeAssessment || 0,
@@ -424,67 +428,6 @@ router.get('/:gradebookId/term/:termId/evaluations', authenticateToken, async (r
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Erro ao buscar avaliações.' });
-    }
-});
-
-// POST: Cadastrar/atualizar as notas de um bimestre em uma caderneta
-router.post('/:gradebookId/term/:termId', authenticateToken, async (req, res) => {
-    try {
-        const { gradebookId, termId } = req.params;
-        const { evaluations } = req.body;
-
-        if (!Array.isArray(evaluations)) {
-            return res.status(400).json({ message: 'Formato de dados inválido. Esperado um array de avaliações.' });
-        }
-
-        // Buscar a caderneta e o bimestre especificado
-        const gradebook = await Gradebook.findById(gradebookId);
-        if (!gradebook) {
-            return res.status(404).json({ message: 'Caderneta não encontrada.' });
-        }
-
-        const term = gradebook.terms.id(termId);
-        if (!term) {
-            return res.status(404).json({ message: 'Bimestre não encontrado.' });
-        }
-
-        // Atualizar ou criar as avaliações dos alunos
-        evaluations.forEach(({ student, evaluation }) => {
-            const existingEvaluation = term.studentEvaluations.find(
-                (eval) => String(eval.student) === String(student.id)
-            );
-
-            if (existingEvaluation) {
-                // Atualizar os campos existentes
-                existingEvaluation.monthlyScore = evaluation.monthlyScore || null;
-                existingEvaluation.bimonthlyScore = evaluation.bimonthlyScore || null;
-                existingEvaluation.qualitativeScore = evaluation.qualitativeScore || null;
-                existingEvaluation.bimonthlyGrade = evaluation.bimonthlyGrade || null;
-                existingEvaluation.recoveryScore = evaluation.recoveryScore || null;
-                existingEvaluation.bimonthlyAverage = evaluation.bimonthlyAverage || null;
-                existingEvaluation.totalAbsences = evaluation.totalAbsences || 0;
-            } else {
-                // Criar uma nova avaliação
-                term.studentEvaluations.push({
-                    student: student.id,
-                    monthlyScore: evaluation.monthlyScore || null,
-                    bimonthlyScore: evaluation.bimonthlyScore || null,
-                    qualitativeScore: evaluation.qualitativeScore || null,
-                    bimonthlyGrade: evaluation.bimonthlyGrade || null,
-                    recoveryScore: evaluation.recoveryScore || null,
-                    bimonthlyAverage: evaluation.bimonthlyAverage || null,
-                    totalAbsences: evaluation.totalAbsences || 0,
-                });
-            }
-        });
-
-        // Salvar as alterações na caderneta
-        await gradebook.save();
-
-        res.status(200).json({ message: 'Avaliações atualizadas com sucesso.' });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Erro ao atualizar as avaliações do bimestre.' });
     }
 });
 
@@ -509,26 +452,57 @@ router.put('/:gradebookId/term/:termId/evaluations', authenticateToken, async (r
             return res.status(404).json({ message: 'Bimestre não encontrado.' });
         }
 
+        // Verificar se studentEvaluations existe no term
+        if (!term.studentEvaluations) {
+            return res.status(400).json({ message: 'Nenhuma avaliação encontrada para este bimestre.' });
+        }
+
         // Atualizar as avaliações dos alunos no bimestre
         evaluations.forEach((evaluation) => {
-            const studentEvaluation = term.studentEvaluations.find(
-                (entry) => String(entry.student) === String(evaluation.student)
+            // Procurar se o aluno já tem uma avaliação existente
+            let studentEvaluation = term.studentEvaluations.find(
+                (entry) => String(entry.student._id) === String(evaluation.student._id)
             );
 
-            if (studentEvaluation) {
-                // Atualizar apenas os campos fornecidos
-                Object.keys(evaluation).forEach((key) => {
-                    if (key !== 'student' && studentEvaluation[key] !== undefined) {
-                        studentEvaluation[key] = evaluation[key];
-                    }
-                });
+            if (!studentEvaluation) {
+                // Se o aluno não tiver uma avaliação, cria-se uma nova com notas iniciais
+                studentEvaluation = {
+                    student: {
+                        name: student.name,
+                        _id: student._id,
+                        cpf: student.cpf
+                    },
+                    monthlyExam: 0,
+                    bimonthlyExam: 0,
+                    qualitativeAssessment: 0,
+                    bimonthlyGrade: 0,
+                    bimonthlyRecovery: 0,
+                    bimonthlyAverage: 0,
+                    totalAbsences: 0
+                };
+                term.studentEvaluations.push(studentEvaluation); // Adiciona a nova avaliação
             }
+
+            // Sobrescreve todas as avaliações com os novos dados fornecidos
+            studentEvaluation.monthlyExam = evaluation.monthlyExam;
+            studentEvaluation.bimonthlyExam = evaluation.bimonthlyExam;
+            studentEvaluation.qualitativeAssessment = evaluation.qualitativeAssessment;
+            studentEvaluation.bimonthlyGrade = evaluation.bimonthlyGrade;
+            studentEvaluation.bimonthlyRecovery = evaluation.bimonthlyRecovery;
+            studentEvaluation.bimonthlyAverage = evaluation.bimonthlyAverage;
+            studentEvaluation.totalAbsences = evaluation.totalAbsences;
         });
 
         // Salvar as alterações na caderneta
         await gradebook.save();
 
-        res.status(200).json({ message: 'Avaliações atualizadas com sucesso.' });
+        // Retornar o array de avaliações atualizado
+        const updatedEvaluations = gradebook.terms.id(termId).studentEvaluations;
+
+        res.status(200).json({
+            message: 'Avaliações atualizadas com sucesso.',
+            evaluations: updatedEvaluations // Enviando as avaliações atualizadas
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Erro ao atualizar as avaliações.' });
