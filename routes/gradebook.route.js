@@ -405,24 +405,43 @@ router.get('/:gradebookId/term/:termId/evaluations', authenticateToken, async (r
             ])
         );
 
-        // Montar os dados para a resposta
-        const evaluations = students.map((student) => {
-            const evaluation = evaluationsMap.get(student._id.toString()) || {};
-            return {
-                student: {
-                    name: student.name,
-                    _id: student._id,
-                    cpf: student.cpf
-                },
-                monthlyExam: evaluation.monthlyExam || 0,
-                bimonthlyExam: evaluation.bimonthlyExam || 0,
-                qualitativeAssessment: evaluation.qualitativeAssessment || 0,
-                bimonthlyGrade: evaluation.bimonthlyGrade || 0,
-                bimonthlyRecovery: evaluation.bimonthlyRecovery || 0,
-                bimonthlyAverage: evaluation.bimonthlyAverage || 0,
-                totalAbsences: evaluation.totalAbsences || 0,
-            };
-        });
+        // Montar os dados para a resposta com o cálculo das faltas
+        const evaluations = await Promise.all(
+            students.map(async (student) => {
+                const evaluation = evaluationsMap.get(student._id.toString()) || {};
+
+                // Calcular o total de faltas
+                let totalAbsences = 0;
+                for (const lesson of term.lessons) {
+                    const attendance = lesson.attendance.find(
+                        (entry) => String(entry.studentId) === String(student._id)
+                    );
+
+                    if (attendance && !attendance.present) {
+                        totalAbsences++;
+                    }
+                }
+
+                // Retorna os dados do aluno, incluindo as avaliações e as faltas
+                return {
+                    student: {
+                        name: student.name,
+                        _id: student._id,
+                        cpf: student.cpf
+                    },
+                    monthlyExam: evaluation.monthlyExam || 0,
+                    bimonthlyExam: evaluation.bimonthlyExam || 0,
+                    qualitativeAssessment: evaluation.qualitativeAssessment || 0,
+                    bimonthlyGrade: evaluation.bimonthlyGrade || 0,
+                    bimonthlyRecovery: evaluation.bimonthlyRecovery || 0,
+                    bimonthlyAverage: evaluation.bimonthlyAverage || 0,
+                    totalAbsences: totalAbsences, // Total de faltas calculado
+                };
+            })
+        );
+
+        // Ordenar os alunos em ordem alfabética pelo nome
+        evaluations.sort((a, b) => a.student.name.localeCompare(b.student.name));
 
         res.status(200).json(evaluations);
     } catch (error) {
