@@ -25,7 +25,8 @@ const ClassroomSchema = new Schema({
         type: Schema.Types.ObjectId,
         ref: 'School', // Referência para a escola a qual a turma pertence
         required: true
-    }
+    },
+    students: [{ type: Schema.Types.ObjectId, ref: 'Student' }],
 }, {
     timestamps: true // Cria automaticamente os campos createdAt e updatedAt
 });

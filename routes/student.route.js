@@ -38,9 +38,9 @@ router.post('/', authenticateToken, async (req, res) => {
         const newStudent = new Student({ name, cpf, birthDate, contact, address, guardian, classroom });
         const savedStudent = await newStudent.save();
 
-        // Atualiza o total de alunos na turma
+        // Atualiza a turma adicionando o novo aluno no array 'students'
         await Classroom.findByIdAndUpdate(classroom, {
-            $inc: { totalStudents: 1 }
+            $push: { students: savedStudent._id }  // Adiciona o aluno ao array de students da turma
         });
 
         res.status(201).json({ message: 'Aluno cadastrado com sucesso', student: savedStudent });
@@ -75,26 +75,30 @@ router.patch('/:id/change-classroom', authenticateToken, async (req, res) => {
     const { newClassroomId } = req.body;
 
     try {
+        // Busca o aluno
         const student = await Student.findById(req.params.id);
         if (!student) {
             return res.status(404).json({ message: 'Aluno não encontrado' });
         }
 
+        // Identifica a turma antiga
         const oldClassroomId = student.classroom;
-        student.classroom = newClassroomId;
 
+        // Atualiza o campo 'classroom' do aluno para a nova turma
+        student.classroom = newClassroomId;
         await student.save();
 
-        // Decrementa o total de alunos da turma antiga
+        // Remove o aluno da turma antiga
         await Classroom.findByIdAndUpdate(oldClassroomId, {
-            $inc: { totalStudents: -1 }
+            $pull: { students: student._id }  // Remove o aluno do array de students da turma antiga
         });
 
-        // Incrementa o total de alunos da nova turma
+        // Adiciona o aluno na nova turma
         await Classroom.findByIdAndUpdate(newClassroomId, {
-            $inc: { totalStudents: 1 }
+            $push: { students: student._id }  // Adiciona o aluno no array de students da nova turma
         });
 
+        // Resposta de sucesso
         res.status(200).json({ message: 'Aluno movido de turma com sucesso', student });
     } catch (error) {
         res.status(500).json({ message: 'Erro ao mudar o aluno de turma', error });
