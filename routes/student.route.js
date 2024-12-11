@@ -94,12 +94,12 @@ router.patch('/:id/change-classroom', authenticateToken, async (req, res) => {
         });
 
         // Adiciona o aluno na nova turma
-        await Classroom.findByIdAndUpdate(newClassroomId, {
+        const newClassroom = await Classroom.findByIdAndUpdate(newClassroomId, {
             $push: { students: student._id }  // Adiciona o aluno no array de students da nova turma
         });
 
         // Resposta de sucesso
-        res.status(200).json({ message: 'Aluno movido de turma com sucesso', student });
+        res.status(200).json({ message: 'Aluno movido de turma com sucesso', newClassroom });
     } catch (error) {
         res.status(500).json({ message: 'Erro ao mudar o aluno de turma', error });
     }
