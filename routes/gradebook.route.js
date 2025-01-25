@@ -528,4 +528,83 @@ router.put('/:gradebookId/term/:termId/evaluations', authenticateToken, async (r
     }
 });
 
+// GET: Rota que busca o Registro geral de atividade
+router.get('/:gradebookId/learning-record', authenticateToken, async (req, res) => {
+    try {
+        const { gradebookId } = req.params;
+
+        // Encontrar o gradebook e fazer o populate nos campos necessários
+        const gradebook = await Gradebook.findById(gradebookId)
+            .populate({
+                path: 'classroom',
+                populate: {
+                    path: 'students',
+                    model: 'Student',
+                    select: 'name cpf',
+                },
+            })
+            .populate('subject', 'name')
+            .populate({
+                path: 'terms.studentEvaluations.student',
+                model: 'Student',
+                select: 'name cpf',
+            });
+
+        if (!gradebook) {
+            return res.status(404).json({ message: 'Gradebook not found' });
+        }
+
+        if (!gradebook.classroom || !gradebook.classroom.students) {
+            return res.status(404).json({ message: 'No students found for this classroom' });
+        }
+
+        // Calcular o registro anual
+        const learningRecord = gradebook.classroom.students.map((student) => {
+            // Total de faltas
+            const totalAbsences = gradebook.terms.reduce((absenceSum, term) => {
+                const lessons = term.lessons || [];
+                const absencesInTerm = lessons.reduce((lessonAbsences, lesson) => {
+                    const attendanceRecord = lesson.attendance.find(
+                        (att) => att.studentId.toString() === student._id.toString()
+                    );
+                    return lessonAbsences + (attendanceRecord && !attendanceRecord.present ? 1 : 0);
+                }, 0);
+                return absenceSum + absencesInTerm;
+            }, 0);
+
+            // Médias bimestrais
+            const bimonthlyAverages = gradebook.terms.map((term) => {
+                const evaluation = term.studentEvaluations.find(
+                    (ev) => ev.student._id.toString() === student._id.toString()
+                );
+                return {
+                    term: term.name,
+                    average: evaluation ? evaluation.bimonthlyAverage || 0 : 0,
+                };
+            });
+
+            // Média anual
+            const annualAverage =
+                bimonthlyAverages.reduce((sum, b) => sum + b.average, 0) /
+                (bimonthlyAverages.length || 1);
+
+            return {
+                student: {
+                    _id: student._id,
+                    name: student.name,
+                    cpf: student.cpf,
+                },
+                bimonthlyAverages,
+                annualAverage: parseFloat(annualAverage.toFixed(2)),
+                totalAbsences,
+            };
+        });
+
+        res.status(200).json(learningRecord);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Internal Server Error' });
+    }
+});
+
 module.exports = router;
