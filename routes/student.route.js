@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Student = require('../models/student.model'); // Assumindo que o modelo Student está neste caminho
 const Classroom = require('../models/classroom.model');
+const Gradebook = require('../models/gradebook.model');
 const { authenticateToken } = require('../utilities');
 const { default: mongoose } = require('mongoose');
 
@@ -72,36 +73,58 @@ router.put('/:id', authenticateToken, async (req, res) => {
 
 // 5. Rota que muda o aluno de turma
 router.patch('/:id/change-classroom', authenticateToken, async (req, res) => {
-    const { newClassroomId } = req.body;
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
     try {
-        // Busca o aluno
-        const student = await Student.findById(req.params.id);
-        if (!student) {
-            return res.status(404).json({ message: 'Aluno não encontrado' });
+        const studentId = req.params.id;
+        const { oldClassroomId, newClassroomId } = req.body;
+
+        // Verificar se a sala atual e a nova sala existem
+        const oldClassroom = await Classroom.findById(oldClassroomId).session(session);
+        const newClassroom = await Classroom.findById(newClassroomId).session(session);
+        if (!oldClassroom || !newClassroom) {
+            return res.status(404).json({ message: 'Sala atual ou nova sala não encontrada.' });
         }
 
-        // Identifica a turma antiga
-        const oldClassroomId = student.classroom;
+        // Verificar se o aluno está na sala atual
+        const studentExists = oldClassroom.students.some(
+            (id) => id.toString() === studentId.toString()
+        );
 
-        // Atualiza o campo 'classroom' do aluno para a nova turma
+        if (!studentExists) {
+            return res.status(400).json({ message: 'O aluno não pertence à sala atual especificada.' });
+        }
+
+        // Atualizar o array de alunos nas salas
+        oldClassroom.students = oldClassroom.students.filter(
+            (id) => id.toString() !== studentId.toString()
+        );
+        newClassroom.students.push(studentId);
+
+        // Atualizar o campo classroom no documento do aluno
+        const student = await Student.findById(studentId).session(session);
+        if (!student) {
+            return res.status(404).json({ message: 'Aluno não encontrado.' });
+        }
         student.classroom = newClassroomId;
-        await student.save();
 
-        // Remove o aluno da turma antiga
-        await Classroom.findByIdAndUpdate(oldClassroomId, {
-            $pull: { students: student._id }  // Remove o aluno do array de students da turma antiga
-        });
+        // Salvar todas as alterações dentro da transação
+        await oldClassroom.save({ session });
+        await newClassroom.save({ session });
+        await student.save({ session });
 
-        // Adiciona o aluno na nova turma
-        const newClassroom = await Classroom.findByIdAndUpdate(newClassroomId, {
-            $push: { students: student._id }  // Adiciona o aluno no array de students da nova turma
-        });
+        // Commit da transação
+        await session.commitTransaction();
+        session.endSession();
 
-        // Resposta de sucesso
-        res.status(200).json({ message: 'Aluno movido de turma com sucesso', newClassroom });
+        return res.status(200).json({ message: 'Aluno transferido com sucesso.', newClassroom });
     } catch (error) {
-        res.status(500).json({ message: 'Erro ao mudar o aluno de turma', error });
+        // Rollback da transação em caso de erro
+        await session.abortTransaction();
+        session.endSession();
+        console.error(error);
+        return res.status(500).json({ message: 'Erro ao transferir aluno.', error });
     }
 });
 
