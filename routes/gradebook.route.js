@@ -541,6 +541,7 @@ router.get('/:gradebookId/learning-record', authenticateToken, async (req, res) 
                     path: 'students',
                     model: 'Student',
                     select: 'name cpf',
+                    options: { sort: { name: 1 } } //Ordena os alunos por nome
                 },
             })
             .populate('subject', 'name')
