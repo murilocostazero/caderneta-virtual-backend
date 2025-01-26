@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const School = require('../models/school.model'); // Ajuste o caminho se necessário
+const User = require('../models/user.model');
 const { authenticateToken } = require('../utilities');
 
 // 1. Rota que busca 1 escola por ID
@@ -152,6 +153,12 @@ router.put('/add-teacher/:schoolId', authenticateToken, async (req, res) => {
         if (!school) {
             return res.status(404).json({ message: 'Escola não encontrada.' });
         }
+
+        await User.findByIdAndUpdate(
+            teacherId,
+            { lastSelectedSchool: schoolId },
+            { new: true }
+        );
 
         res.status(200).json({ message: 'Professor adicionado com sucesso.', school });
 

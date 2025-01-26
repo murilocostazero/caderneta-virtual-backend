@@ -26,8 +26,14 @@ router.get('/:id', authenticateToken, async (req, res) => {
 // 2. Rota que busca todos os gradebooks de um teacher
 router.get('/teacher/:teacherId', authenticateToken, async (req, res) => {
     try {
-        const gradebooks = await Gradebook.find({ teacher: req.params.teacherId });
-        res.json(gradebooks);
+        const gradebooks = await Gradebook.find({ teacher: req.params.teacherId })
+            .populate('teacher', 'name') // Preenche o campo 'professor' com o nome do professor
+            .populate('subject', 'name')   // Preenche o campo 'subject' com o nome da matéria
+            .populate('classroom', 'grade name shift') // Preenche o campo 'classroom' com o nome da turma
+            .populate('school', '_id')  // Opcional, preenche o campo 'school' com o ID da escola (se necessário)
+            .sort({ 'classroom.grade': 1, 'classroom.name': 1 });
+
+        res.status(200).json(gradebooks);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
