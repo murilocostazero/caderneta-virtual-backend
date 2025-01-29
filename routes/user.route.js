@@ -104,6 +104,18 @@ router.get('/get-user', authenticateToken, async (req, res) => {
     });
 });
 
+router.get('/get-user/:id', authenticateToken, async (req, res) => {
+    const user = await User.findOne({ _id: req.params.id });
+    if (!user) {
+        return res.sendStatus(401);
+    }
+
+    return res.json({
+        user: user,
+        message: ''
+    });
+});
+
 // Rota para buscar todos os professores
 router.get('/get-team/:schoolId', authenticateToken, async (req, res) => {
     try {
