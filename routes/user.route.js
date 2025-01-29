@@ -105,11 +105,10 @@ router.get('/get-user', authenticateToken, async (req, res) => {
 });
 
 // Rota para buscar todos os professores
-router.get('/get-teachers', authenticateToken, async (req, res) => {
+router.get('/get-team/:schoolId', authenticateToken, async (req, res) => {
     try {
-        // Busca todos os usuários com userType 'teacher'
-        const teachers = await User.find({ userType: 'teacher' });
-        res.status(200).json(teachers);
+        const team = await User.find({ lastSelectedSchool: req.params.schoolId });
+        res.status(200).json(team);
     } catch (error) {
         console.error('Erro ao buscar professores:', error);
         res.status(500).json({ message: 'Erro ao buscar professores' });
@@ -216,7 +215,90 @@ router.put('/remove-teacher/:schoolId/:teacherId', async (req, res) => {
     }
 });
 
+// Rota para adicionar um novo usuário
+router.post('/', authenticateToken, async (req, res) => {
+    const {
+        name,
+        email,
+        password,
+        cpf,
+        phone,
+        address,
+        areaOfExpertise,
+        birthDate,
+        userType,
+        lastSelectedSchool
+    } = req.body;
 
+    try {
+        // Cria uma nova instância do usuário
+        const newUser = new User({
+            name,
+            email,
+            password,
+            cpf,
+            phone,
+            address,
+            areaOfExpertise,
+            birthDate,
+            userType,
+            lastSelectedSchool,
+        });
 
+        // Salva no banco de dados
+        await newUser.save();
+
+        return res.status(201).json({ message: 'Usuário criado com sucesso!', user: newUser });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ error: 'Erro ao criar usuário.' });
+    }
+});
+
+// Rota para atualizar um usuário existente
+router.put('/:id', authenticateToken, async (req, res) => {
+    const userId = req.params.id;
+    const {
+        name,
+        email,
+        password,
+        cpf,
+        phone,
+        address,
+        areaOfExpertise,
+        birthDate,
+        userType,
+        lastSelectedSchool,
+    } = req.body;
+
+    try {
+        // Busca e atualiza o usuário
+        const updatedUser = await User.findByIdAndUpdate(
+            userId,
+            {
+                name,
+                email,
+                password,
+                cpf,
+                phone,
+                address,
+                areaOfExpertise,
+                birthDate,
+                userType,
+                lastSelectedSchool,
+            },
+            { new: true } // Retorna o documento atualizado
+        );
+
+        if (!updatedUser) {
+            return res.status(404).json({ error: 'Usuário não encontrado.' });
+        }
+
+        return res.status(200).json({ message: 'Usuário atualizado com sucesso!', user: updatedUser });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ error: 'Erro ao atualizar usuário.' });
+    }
+});
 
 module.exports = router;
