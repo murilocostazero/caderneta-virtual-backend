@@ -260,6 +260,13 @@ router.post('/', authenticateToken, async (req, res) => {
         // Salva no banco de dados
         await newUser.save();
 
+        // Se o usuário for professor, adicioná-lo à lista de professores da escola
+        if (userType === 'teacher' && lastSelectedSchool) {
+            await School.findByIdAndUpdate(lastSelectedSchool, {
+                $addToSet: { teachers: newUser._id }
+            });
+        }
+
         return res.status(201).json({ message: 'Usuário criado com sucesso!', user: newUser });
     } catch (error) {
         console.error(error);

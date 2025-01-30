@@ -477,56 +477,71 @@ router.put('/:gradebookId/term/:termId/evaluations', authenticateToken, async (r
             return res.status(404).json({ message: 'Bimestre não encontrado.' });
         }
 
-        // Verificar se studentEvaluations existe no term
+        // Se studentEvaluations não existir, inicializa como um array vazio
         if (!term.studentEvaluations) {
-            return res.status(400).json({ message: 'Nenhuma avaliação encontrada para este bimestre.' });
+            term.studentEvaluations = [];
         }
+
+        let hasChanges = false; // Flag para saber se houve mudanças
 
         // Atualizar as avaliações dos alunos no bimestre
         evaluations.forEach((evaluation) => {
-            // Procurar se o aluno já tem uma avaliação existente
             let studentEvaluation = term.studentEvaluations.find(
                 (entry) => String(entry.student._id) === String(evaluation.student._id)
             );
 
             if (!studentEvaluation) {
-                // Se o aluno não tiver uma avaliação, cria-se uma nova com notas iniciais
-                studentEvaluation = {
+                studentEvaluation = term.studentEvaluations.create({
                     student: {
-                        name: student.name,
-                        _id: student._id,
-                        cpf: student.cpf
+                        name: evaluation.student.name,
+                        _id: evaluation.student._id,
+                        cpf: evaluation.student.cpf
                     },
-                    monthlyExam: 0,
-                    bimonthlyExam: 0,
-                    qualitativeAssessment: 0,
-                    bimonthlyGrade: 0,
-                    bimonthlyRecovery: 0,
-                    bimonthlyAverage: 0,
-                    totalAbsences: 0
-                };
-                term.studentEvaluations.push(studentEvaluation); // Adiciona a nova avaliação
-            }
+                    monthlyExam: evaluation.monthlyExam,
+                    bimonthlyExam: evaluation.bimonthlyExam,
+                    qualitativeAssessment: evaluation.qualitativeAssessment,
+                    bimonthlyGrade: evaluation.bimonthlyGrade,
+                    bimonthlyRecovery: evaluation.bimonthlyRecovery,
+                    bimonthlyAverage: evaluation.bimonthlyAverage,
+                    totalAbsences: evaluation.totalAbsences
+                });
 
-            // Sobrescreve todas as avaliações com os novos dados fornecidos
-            studentEvaluation.monthlyExam = evaluation.monthlyExam;
-            studentEvaluation.bimonthlyExam = evaluation.bimonthlyExam;
-            studentEvaluation.qualitativeAssessment = evaluation.qualitativeAssessment;
-            studentEvaluation.bimonthlyGrade = evaluation.bimonthlyGrade;
-            studentEvaluation.bimonthlyRecovery = evaluation.bimonthlyRecovery;
-            studentEvaluation.bimonthlyAverage = evaluation.bimonthlyAverage;
-            studentEvaluation.totalAbsences = evaluation.totalAbsences;
+                term.studentEvaluations.push(studentEvaluation);
+                hasChanges = true;
+            } else {
+                // Atualiza apenas se houver mudanças nos valores
+                if (
+                    studentEvaluation.monthlyExam !== evaluation.monthlyExam ||
+                    studentEvaluation.bimonthlyExam !== evaluation.bimonthlyExam ||
+                    studentEvaluation.qualitativeAssessment !== evaluation.qualitativeAssessment ||
+                    studentEvaluation.bimonthlyGrade !== evaluation.bimonthlyGrade ||
+                    studentEvaluation.bimonthlyRecovery !== evaluation.bimonthlyRecovery ||
+                    studentEvaluation.bimonthlyAverage !== evaluation.bimonthlyAverage ||
+                    studentEvaluation.totalAbsences !== evaluation.totalAbsences
+                ) {
+                    studentEvaluation.monthlyExam = evaluation.monthlyExam;
+                    studentEvaluation.bimonthlyExam = evaluation.bimonthlyExam;
+                    studentEvaluation.qualitativeAssessment = evaluation.qualitativeAssessment;
+                    studentEvaluation.bimonthlyGrade = evaluation.bimonthlyGrade;
+                    studentEvaluation.bimonthlyRecovery = evaluation.bimonthlyRecovery;
+                    studentEvaluation.bimonthlyAverage = evaluation.bimonthlyAverage;
+                    studentEvaluation.totalAbsences = evaluation.totalAbsences;
+                    hasChanges = true;
+                }
+            }
         });
 
-        // Salvar as alterações na caderneta
-        await gradebook.save();
+        if (hasChanges) {
+            term.markModified('studentEvaluations'); // Força o Mongoose a reconhecer a mudança
+            await gradebook.save();
+        }
 
         // Retornar o array de avaliações atualizado
         const updatedEvaluations = gradebook.terms.id(termId).studentEvaluations;
 
         res.status(200).json({
             message: 'Avaliações atualizadas com sucesso.',
-            evaluations: updatedEvaluations // Enviando as avaliações atualizadas
+            evaluations: updatedEvaluations
         });
     } catch (error) {
         console.error(error);
