@@ -31,6 +31,7 @@ router.get('/teacher/:teacherId', authenticateToken, async (req, res) => {
             .populate('subject', 'name')   // Preenche o campo 'subject' com o nome da matéria
             .populate('classroom', 'grade name shift') // Preenche o campo 'classroom' com o nome da turma
             .populate('school', '_id')  // Opcional, preenche o campo 'school' com o ID da escola (se necessário)
+            .populate('terms.studentEvaluations.student', 'name') // Nome do aluno dentro das avaliações
             .sort({ 'classroom.grade': 1, 'classroom.name': 1 });
 
         res.status(200).json(gradebooks);
@@ -48,6 +49,7 @@ router.get('/school/:schoolId', authenticateToken, async (req, res) => {
             .populate('subject', 'name')   // Preenche o campo 'subject' com o nome da matéria
             .populate('classroom', 'grade name shift') // Preenche o campo 'classroom' com o nome da turma
             .populate('school', '_id')  // Opcional, preenche o campo 'school' com o ID da escola (se necessário)
+            .populate('terms.studentEvaluations.student', 'name') // Nome do aluno dentro das avaliações
             .sort({ 'classroom.grade': 1, 'classroom.name': 1 });
 
         res.status(200).json(gradebooks);
