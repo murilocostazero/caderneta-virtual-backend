@@ -31,7 +31,7 @@ app.use('/student', student);
 app.use('/gradebook', gradebook);
 
 // Iniciar o servidor
-app.listen(8000, () => {
+app.listen(process.env.PORT, () => {
     console.log('Server is running on port 8000');
 });
 
