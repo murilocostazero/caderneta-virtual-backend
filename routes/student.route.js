@@ -36,6 +36,14 @@ router.post('/', authenticateToken, async (req, res) => {
     const { name, cpf, birthDate, contact, address, guardian, classroom } = req.body;
 
     try {
+        // Verifica se já existe um aluno com o mesmo CPF
+        const existingStudent = await Student.findOne({ cpf });
+
+        if (existingStudent) {
+            return res.status(400).json({ message: 'Já existe um aluno cadastrado com este CPF' });
+        }
+
+        // Cria o novo aluno
         const newStudent = new Student({ name, cpf, birthDate, contact, address, guardian, classroom });
         const savedStudent = await newStudent.save();
 
