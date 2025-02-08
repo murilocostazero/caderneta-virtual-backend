@@ -2,6 +2,11 @@ const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
 const ClassroomSchema = new Schema({
+    classroomType: {
+        type: String,
+        enum: ['kindergarten', 'elementary', 'high'],
+        require: true
+    },
     grade: {
         type: String, // Ex: "8º ano"
         required: true,
@@ -9,7 +14,6 @@ const ClassroomSchema = new Schema({
     },
     name: {
         type: String, // Nome da turma, ex: "Turma A", "Turma B"
-        required: true,
         trim: true
     },
     shift: {

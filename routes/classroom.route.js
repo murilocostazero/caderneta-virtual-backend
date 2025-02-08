@@ -18,8 +18,8 @@ router.get('/:id', authenticateToken, async (req, res) => {
 
 router.post('/', authenticateToken, async (req, res) => {
     try {
-        const { grade, name, shift, school } = req.body;
-        const newClassroom = new Classroom({ grade, name, shift, school });
+        const { classroomType, grade, name, shift, school } = req.body;
+        const newClassroom = new Classroom({ classroomType, grade, name, shift, school });
         await newClassroom.save();
         res.status(201).json({ message: 'Turma adicionada com sucesso.', classroom: newClassroom });
     } catch (error) {
@@ -30,10 +30,10 @@ router.post('/', authenticateToken, async (req, res) => {
 
 router.put('/:id', authenticateToken, async (req, res) => {
     try {
-        const { grade, name, shift } = req.body;
+        const { classroomType, grade, name, shift } = req.body;
         const updatedClassroom = await Classroom.findByIdAndUpdate(
             req.params.id,
-            { grade, name, shift },
+            { classroomType, grade, name, shift },
             { new: true }
         );
         if (!updatedClassroom) {
