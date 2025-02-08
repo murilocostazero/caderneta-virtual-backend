@@ -17,7 +17,10 @@ router.get('/:id', authenticateToken, async (req, res) => {
 //Rota para buscar todas as disciplinas da escola
 router.get('/school/:schoolId', authenticateToken, async (req, res) => {
     try {
-        const subjects = await SchoolSubject.find({ school: req.params.schoolId }).populate('teachers');
+        const subjects = await SchoolSubject.find({ school: req.params.schoolId })
+        .populate('teachers')        
+        .sort({ 'name': 1 });
+        
         res.status(200).json(subjects);
     } catch (error) {
         res.status(500).json({ message: 'Erro ao buscar disciplinas.', error });

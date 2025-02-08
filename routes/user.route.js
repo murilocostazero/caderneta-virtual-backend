@@ -119,7 +119,9 @@ router.get('/get-user/:id', authenticateToken, async (req, res) => {
 // Rota para buscar todos os professores
 router.get('/get-team/:schoolId', authenticateToken, async (req, res) => {
     try {
-        const team = await User.find({ lastSelectedSchool: req.params.schoolId });
+        const team = await User.find({ lastSelectedSchool: req.params.schoolId })
+        .sort({ 'name': 1 });
+
         res.status(200).json(team);
     } catch (error) {
         console.error('Erro ao buscar professores:', error);
