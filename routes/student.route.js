@@ -63,6 +63,13 @@ router.put('/:id', authenticateToken, async (req, res) => {
     const { name, cpf, birthDate, contact, address, guardian } = req.body;
 
     try {
+         // Verifica se já existe um aluno com o mesmo CPF
+         const existingStudent = await Student.findOne({ cpf });
+
+         if (existingStudent) {
+             return res.status(400).json({ message: 'Já existe um aluno cadastrado com este CPF' });
+         }
+         
         const updatedStudent = await Student.findByIdAndUpdate(
             req.params.id,
             { name, cpf, birthDate, contact, address, guardian },
