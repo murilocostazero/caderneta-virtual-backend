@@ -61,17 +61,18 @@ router.post('/', authenticateToken, async (req, res) => {
 // 4. Rota que altera os dados de 1 aluno
 router.put('/:id', authenticateToken, async (req, res) => {
     const { name, cpf, birthDate, contact, address, guardian } = req.body;
+    const studentId = req.params.id;
 
     try {
-         // Verifica se já existe um aluno com o mesmo CPF
-         const existingStudent = await Student.findOne({ cpf });
+        // Verifica se já existe um aluno com o mesmo CPF, mas exclui o próprio aluno da verificação
+        const existingStudent = await Student.findOne({ cpf, _id: { $ne: studentId } });
 
-         if (existingStudent.name !== name) {
-             return res.status(400).json({ message: 'Já existe um outro aluno cadastrado com este CPF' });
-         }
-         
+        if (existingStudent) {
+            return res.status(400).json({ message: 'Já existe um outro aluno cadastrado com este CPF' });
+        }
+
         const updatedStudent = await Student.findByIdAndUpdate(
-            req.params.id,
+            studentId,
             { name, cpf, birthDate, contact, address, guardian },
             { new: true }
         );
