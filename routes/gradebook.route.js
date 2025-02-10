@@ -10,7 +10,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
         const gradebook = await Gradebook.findById(req.params.id)
             .populate('teacher', 'name') // Preenche o campo 'professor' com o nome do professor
             .populate('subject', 'name')   // Preenche o campo 'subject' com o nome da matéria
-            .populate('classroom', 'grade name shift') // Preenche o campo 'classroom' com o nome da turma
+            .populate('classroom', 'classroomType grade name shift') // Preenche o campo 'classroom' com o nome da turma
             .populate('school', '_id');  // Opcional, preenche o campo 'school' com o ID da escola (se necessário)
 
         if (!gradebook) {
@@ -29,7 +29,7 @@ router.get('/teacher/:teacherId', authenticateToken, async (req, res) => {
         const gradebooks = await Gradebook.find({ teacher: req.params.teacherId })
             .populate('teacher', 'name') // Preenche o campo 'professor' com o nome do professor
             .populate('subject', 'name')   // Preenche o campo 'subject' com o nome da matéria
-            .populate('classroom', 'grade name shift') // Preenche o campo 'classroom' com o nome da turma
+            .populate('classroom', 'classroomType grade name shift') // Preenche o campo 'classroom' com o nome da turma
             .populate('school', '_id')  // Opcional, preenche o campo 'school' com o ID da escola (se necessário)
             .populate('terms.studentEvaluations.student', 'name') // Nome do aluno dentro das avaliações
             .sort({ 'classroom.grade': 1, 'classroom.name': 1 });
@@ -47,7 +47,7 @@ router.get('/school/:schoolId', authenticateToken, async (req, res) => {
         const gradebooks = await Gradebook.find({ school: req.params.schoolId })
             .populate('teacher', 'name') // Preenche o campo 'professor' com o nome do professor
             .populate('subject', 'name')   // Preenche o campo 'subject' com o nome da matéria
-            .populate('classroom', 'grade name shift') // Preenche o campo 'classroom' com o nome da turma
+            .populate('classroom', 'classroomType grade name shift') // Preenche o campo 'classroom' com o nome da turma
             .populate('school', '_id')  // Opcional, preenche o campo 'school' com o ID da escola (se necessário)
             .populate('terms.studentEvaluations.student', 'name') // Nome do aluno dentro das avaliações
             .sort({ 'classroom.grade': 1, 'classroom.name': 1 });
@@ -106,7 +106,7 @@ router.post('/:gradebookId/term', authenticateToken, async (req, res) => {
         const gradebook = await Gradebook.findById(gradebookId)
             .populate('teacher', 'name')
             .populate('subject', 'name')
-            .populate('classroom', 'grade name shift')
+            .populate('classroom', 'classroomType grade name shift')
             .populate('school', '_id');
 
         if (!gradebook) {
@@ -141,7 +141,7 @@ router.put('/:gradebookId/term/:termId', authenticateToken, async (req, res) => 
         const gradebook = await Gradebook.findById(gradebookId)
             .populate('teacher', 'name')
             .populate('subject', 'name')
-            .populate('classroom', 'grade name shift')
+            .populate('classroom', 'classroomType grade name shift')
             .populate('school', '_id');
 
         if (!gradebook) {
@@ -178,7 +178,7 @@ router.post('/:gradebookId/term/:termId/lesson', authenticateToken, async (req, 
         const gradebook = await Gradebook.findById(req.params.gradebookId)
             .populate('teacher', 'name') // Preenche o campo 'professor' com o nome do professor
             .populate('subject', 'name')   // Preenche o campo 'subject' com o nome da matéria
-            .populate('classroom', 'grade name shift') // Preenche o campo 'classroom' com o nome da turma
+            .populate('classroom', 'classroomType grade name shift') // Preenche o campo 'classroom' com o nome da turma
             .populate('school', '_id');
 
         if (!gradebook) {
@@ -207,7 +207,7 @@ router.put('/:gradebookId/term/:termId/lesson/:lessonId', authenticateToken, asy
         const gradebook = await Gradebook.findById(req.params.gradebookId)
             .populate('teacher', 'name') // Preenche o campo 'professor' com o nome do professor
             .populate('subject', 'name')   // Preenche o campo 'subject' com o nome da matéria
-            .populate('classroom', 'grade name shift') // Preenche o campo 'classroom' com o nome da turma
+            .populate('classroom', 'classroomType grade name shift') // Preenche o campo 'classroom' com o nome da turma
             .populate('school', '_id');
 
         if (!gradebook) {
@@ -272,7 +272,7 @@ router.post('/:gradebookId/term/:termId/lesson/:lessonId/attendance', authentica
         const gradebook = await Gradebook.findById(req.params.gradebookId)
             .populate('teacher', 'name') // Preenche o campo 'professor' com o nome do professor
             .populate('subject', 'name')   // Preenche o campo 'subject' com o nome da matéria
-            .populate('classroom', 'grade name shift') // Preenche o campo 'classroom' com o nome da turma
+            .populate('classroom', 'classroomType grade name shift') // Preenche o campo 'classroom' com o nome da turma
             .populate('school', '_id');  // Opcional, preenche o campo 'school' com o ID da escola (se necessário)
 
         if (!gradebook) {
@@ -310,7 +310,7 @@ router.put('/:gradebookId/term/:termId/lesson/:lessonId/attendance', authenticat
         const gradebook = await Gradebook.findById(req.params.gradebookId)
             .populate('teacher', 'name') // Preenche o campo 'professor' com o nome do professor
             .populate('subject', 'name')   // Preenche o campo 'subject' com o nome da matéria
-            .populate('classroom', 'grade name shift') // Preenche o campo 'classroom' com o nome da turma
+            .populate('classroom', 'classroomType grade name shift') // Preenche o campo 'classroom' com o nome da turma
             .populate('school', '_id')  // Opcional, preenche o campo 'school' com o ID da escola (se necessário)
             .sort({ 'classroom.grade': 1, 'classroom.name': 1 });
 
