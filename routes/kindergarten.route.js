@@ -1,115 +1,110 @@
 const express = require('express');
 const router = express.Router();
-const Gradebook = require('../models/gradebook.model');
+const Kindergarten = require('../models/kindergarten.model');
 const Student = require('../models/student.model');
 const { authenticateToken } = require('../utilities');
 
-// 1. Rota que busca um gradebook por ID
+// 1. Rota que busca um kindergarten por ID
 router.get('/:id', authenticateToken, async (req, res) => {
     try {
-        const gradebook = await Gradebook.findById(req.params.id)
+        const kindergarten = await Kindergarten.findById(req.params.id)
             .populate('teacher', 'name') // Preenche o campo 'professor' com o nome do professor
-            .populate('subject', 'name')   // Preenche o campo 'subject' com o nome da matéria
             .populate('classroom', 'classroomType grade name shift') // Preenche o campo 'classroom' com o nome da turma
             .populate('school', '_id');  // Opcional, preenche o campo 'school' com o ID da escola (se necessário)
 
-        if (!gradebook) {
-            return res.status(404).json({ message: "Gradebook not found" });
+        if (!kindergarten) {
+            return res.status(404).json({ message: "Kindergarten not found" });
         }
 
-        res.status(200).json(gradebook);
+        res.status(200).json(kindergarten);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
 });
 
-// 2. Rota que busca todos os gradebooks de um teacher
+// 2. Rota que busca todos os kindergartens de um teacher
 router.get('/teacher/:teacherId', authenticateToken, async (req, res) => {
     try {
-        const gradebooks = await Gradebook.find({ teacher: req.params.teacherId })
+        const kindergartens = await Kindergarten.find({ teacher: req.params.teacherId })
             .populate('teacher', 'name') // Preenche o campo 'professor' com o nome do professor
-            .populate('subject', 'name')   // Preenche o campo 'subject' com o nome da matéria
             .populate('classroom', 'classroomType grade name shift') // Preenche o campo 'classroom' com o nome da turma
             .populate('school', '_id')  // Opcional, preenche o campo 'school' com o ID da escola (se necessário)
             .populate('terms.studentEvaluations.student', 'name') // Nome do aluno dentro das avaliações
             .sort({ 'classroom.grade': 1, 'classroom.name': 1 });
 
-        res.status(200).json(gradebooks);
+        res.status(200).json(kindergartens);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
 });
 
-// 3. Rota que busca todos os gradebooks de uma escola
+// 3. Rota que busca todos os kindergartens de uma escola
 router.get('/school/:schoolId', authenticateToken, async (req, res) => {
     try {
-        const gradebooks = await Gradebook.find({ school: req.params.schoolId })
+        const kindergartens = await Kindergarten.find({ school: req.params.schoolId })
             .populate('teacher', 'name') // Preenche o campo 'professor' com o nome do professor
-            .populate('subject', 'name')   // Preenche o campo 'subject' com o nome da matéria
             .populate('classroom', 'classroomType grade name shift') // Preenche o campo 'classroom' com o nome da turma
             .populate('school', '_id')  // Opcional, preenche o campo 'school' com o ID da escola (se necessário)
             .populate('terms.studentEvaluations.student', 'name') // Nome do aluno dentro das avaliações
             .sort({ 'classroom.grade': 1, 'classroom.name': 1 });
 
-        res.status(200).json(gradebooks);
+        res.status(200).json(kindergartens);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
 });
 
-// 4. Rota que adiciona um novo gradebook
+// 4. Rota que adiciona um novo kindergarten
 router.post('/', authenticateToken, async (req, res) => {
-    const { academicYear, school, classroom, teacher, subject } = req.body;
+    const { academicYear, school, classroom, teacher } = req.body;
 
-    const newGradebook = new Gradebook({
+    const newKindergarten = new Kindergarten({
         academicYear,
         school,
         classroom,
-        teacher,
-        subject
+        teacher
     });
 
     try {
-        const savedGradebook = await newGradebook.save();
-        res.status(201).json(savedGradebook);
+        const savedKindergarten = await newKindergarten.save();
+        res.status(201).json(savedKindergarten);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
 });
 
-// 5. Rota que altera os dados do gradebook
+// 5. Rota que altera os dados do kindergarten
 router.put('/:id', authenticateToken, async (req, res) => {
-    const { academicYear, skill, school, classroom, teacher, subject } = req.body;
+    const { academicYear, school, classroom, teacher } = req.body;
 
     try {
-        const updatedGradebook = await Gradebook.findByIdAndUpdate(
+        const updatedKindergarten = await Kindergarten.findByIdAndUpdate(
             req.params.id,
-            { academicYear, skill, school, classroom, teacher, subject },
+            { academicYear, school, classroom, teacher },
             { new: true }
         );
-        if (!updatedGradebook) {
-            return res.status(404).json({ message: "Gradebook not found" });
+        if (!updatedKindergarten) {
+            return res.status(404).json({ message: "Kindergarten not found" });
         }
-        res.status(200).json(updatedGradebook);
+        res.status(200).json(updatedKindergarten);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
 });
 
 // 6. Adicionar um novo TermSchema
-router.post('/:gradebookId/term', authenticateToken, async (req, res) => {
+router.post('/:kindergartenId/term', authenticateToken, async (req, res) => {
     try {
-        const { gradebookId } = req.params;
+        const { kindergartenId } = req.params;
         const { name, startDate, endDate } = req.body;
 
-        const gradebook = await Gradebook.findById(gradebookId)
+        const kindergarten = await Kindergarten.findById(kindergartenId)
             .populate('teacher', 'name')
-            .populate('subject', 'name')
             .populate('classroom', 'classroomType grade name shift')
             .populate('school', '_id');
 
-        if (!gradebook) {
-            return res.status(404).json({ message: "Gradebook não encontrado" });
+        if (!kindergarten) {
+            return res.status(404).json({ message: "Kindergarten não encontrado" });
         }
 
         // Criação do novo TermSchema
@@ -121,34 +116,33 @@ router.post('/:gradebookId/term', authenticateToken, async (req, res) => {
             studentEvaluations: []
         };
 
-        // Adicionar o novo Term ao gradebook
-        gradebook.terms.push(newTerm);
-        await gradebook.save();
+        // Adicionar o novo Term ao kindergarten
+        kindergarten.terms.push(newTerm);
+        await kindergarten.save();
 
-        res.status(201).json({ message: "Bimestre adicionado com sucesso!", gradebook });
+        res.status(201).json({ message: "Bimestre adicionado com sucesso!", kindergarten });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
 });
 
 // 7. Atualizar um TermSchema existente
-router.put('/:gradebookId/term/:termId', authenticateToken, async (req, res) => {
+router.put('/:kindergartenId/term/:termId', authenticateToken, async (req, res) => {
     try {
-        const { gradebookId, termId } = req.params;
+        const { kindergartenId, termId } = req.params;
         const { name, startDate, endDate } = req.body;
 
-        const gradebook = await Gradebook.findById(gradebookId)
+        const kindergarten = await Kindergarten.findById(kindergartenId)
             .populate('teacher', 'name')
-            .populate('subject', 'name')
             .populate('classroom', 'classroomType grade name shift')
             .populate('school', '_id');
 
-        if (!gradebook) {
-            return res.status(404).json({ message: "Gradebook não encontrado" });
+        if (!kindergarten) {
+            return res.status(404).json({ message: "Kindergarten não encontrado" });
         }
 
         // Encontrar o Term pelo ID
-        const term = gradebook.terms.id(termId);
+        const term = kindergarten.terms.id(termId);
         if (!term) {
             return res.status(404).json({ message: "Bimestre não encontrado" });
         }
@@ -158,62 +152,60 @@ router.put('/:gradebookId/term/:termId', authenticateToken, async (req, res) => 
         if (startDate) term.startDate = startDate;
         if (endDate) term.endDate = endDate;
 
-        await gradebook.save();
+        await kindergarten.save();
 
-        res.status(200).json({ message: "Bimestre atualizado com sucesso!", gradebook });
+        res.status(200).json({ message: "Bimestre atualizado com sucesso!", kindergarten });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
 });
 
 // 8. Rota para adicionar uma nova Lesson
-router.post('/:gradebookId/term/:termId/lesson', authenticateToken, async (req, res) => {
+router.post('/:kindergartenId/term/:termId/lesson', authenticateToken, async (req, res) => {
     const { topic, date } = req.body;
     if (!topic || !date) {
         return res.status(400).json({ message: 'Assunto e data são obrigatórios' });
     }
 
     try {
-        const gradebook = await Gradebook.findById(req.params.gradebookId)
+        const kindergarten = await Kindergarten.findById(req.params.kindergartenId)
             .populate('teacher', 'name') // Preenche o campo 'professor' com o nome do professor
-            .populate('subject', 'name')   // Preenche o campo 'subject' com o nome da matéria
             .populate('classroom', 'classroomType grade name shift') // Preenche o campo 'classroom' com o nome da turma
             .populate('school', '_id');
 
-        if (!gradebook) {
+        if (!kindergarten) {
             return res.status(404).json({ message: 'Caderneta não encontrada' });
         }
 
-        const term = gradebook.terms.id(req.params.termId);
+        const term = kindergarten.terms.id(req.params.termId);
         if (!term) {
             return res.status(404).json({ message: 'Bimestre não encontrado' });
         }
 
         term.lessons.push({ topic, date });
-        await gradebook.save();
+        await kindergarten.save();
 
-        res.status(201).json({ message: 'Aula adicionada com sucesso', gradebook }); //Retorno o gradebook pra atualizar o componente
+        res.status(201).json({ message: 'Aula adicionada com sucesso', kindergarten }); //Retorno o kindergarten pra atualizar o componente
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
 });
 
 // 9. Rota para editar uma Lesson
-router.put('/:gradebookId/term/:termId/lesson/:lessonId', authenticateToken, async (req, res) => {
+router.put('/:kindergartenId/term/:termId/lesson/:lessonId', authenticateToken, async (req, res) => {
     const { topic, date } = req.body;
 
     try {
-        const gradebook = await Gradebook.findById(req.params.gradebookId)
+        const kindergarten = await Kindergarten.findById(req.params.kindergartenId)
             .populate('teacher', 'name') // Preenche o campo 'professor' com o nome do professor
-            .populate('subject', 'name')   // Preenche o campo 'subject' com o nome da matéria
             .populate('classroom', 'classroomType grade name shift') // Preenche o campo 'classroom' com o nome da turma
             .populate('school', '_id');
 
-        if (!gradebook) {
-            return res.status(404).json({ message: 'Gradebook not found.' });
+        if (!kindergarten) {
+            return res.status(404).json({ message: 'Kindergarten not found.' });
         }
 
-        const term = gradebook.terms.id(req.params.termId);
+        const term = kindergarten.terms.id(req.params.termId);
         if (!term) {
             return res.status(404).json({ message: 'Term not found.' });
         }
@@ -229,22 +221,22 @@ router.put('/:gradebookId/term/:termId/lesson/:lessonId', authenticateToken, asy
         // Ordenar as aulas por data após atualizar a lesson
         term.lessons = term.lessons.sort((a, b) => new Date(a.date) - new Date(b.date));
 
-        await gradebook.save();
-        res.status(200).json({ message: 'Lesson updated successfully.', gradebook });
+        await kindergarten.save();
+        res.status(200).json({ message: 'Lesson updated successfully.', kindergarten });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
 });
 
 // Rota para excluir uma Lesson
-router.delete('/:gradebookId/term/:termId/lesson/:lessonId', authenticateToken, async (req, res) => {
+router.delete('/:kindergartenId/term/:termId/lesson/:lessonId', authenticateToken, async (req, res) => {
     try {
-        const gradebook = await Gradebook.findById(req.params.gradebookId);
-        if (!gradebook) {
-            return res.status(404).json({ message: 'Gradebook not found.' });
+        const kindergarten = await Kindergarten.findById(req.params.kindergartenId);
+        if (!kindergarten) {
+            return res.status(404).json({ message: 'Kindergarten not found.' });
         }
 
-        const term = gradebook.terms.id(req.params.termId);
+        const term = kindergarten.terms.id(req.params.termId);
         if (!term) {
             return res.status(404).json({ message: 'Term not found.' });
         }
@@ -255,7 +247,7 @@ router.delete('/:gradebookId/term/:termId/lesson/:lessonId', authenticateToken, 
         }
 
         lesson.remove();
-        await gradebook.save();
+        await kindergarten.save();
 
         res.status(200).json({ message: 'Lesson deleted successfully.' });
     } catch (err) {
@@ -264,21 +256,20 @@ router.delete('/:gradebookId/term/:termId/lesson/:lessonId', authenticateToken, 
 });
 
 //Rota para criar uma chamada
-router.post('/:gradebookId/term/:termId/lesson/:lessonId/attendance', authenticateToken, async (req, res) => {
+router.post('/:kindergartenId/term/:termId/lesson/:lessonId/attendance', authenticateToken, async (req, res) => {
     const { attendance } = req.body; // Array de { studentId, present }
 
     try {
-        const gradebook = await Gradebook.findById(req.params.gradebookId)
+        const kindergarten = await Kindergarten.findById(req.params.kindergartenId)
             .populate('teacher', 'name') // Preenche o campo 'professor' com o nome do professor
-            .populate('subject', 'name')   // Preenche o campo 'subject' com o nome da matéria
             .populate('classroom', 'classroomType grade name shift') // Preenche o campo 'classroom' com o nome da turma
             .populate('school', '_id');  // Opcional, preenche o campo 'school' com o ID da escola (se necessário)
 
-        if (!gradebook) {
+        if (!kindergarten) {
             return res.status(404).json({ message: 'Caderneta não encontrada' });
         }
 
-        const term = gradebook.terms.id(req.params.termId);
+        const term = kindergarten.terms.id(req.params.termId);
         if (!term) {
             return res.status(404).json({ message: 'Bimestre não encontrado' });
         }
@@ -293,31 +284,30 @@ router.post('/:gradebookId/term/:termId/lesson/:lessonId/attendance', authentica
         }
 
         lesson.attendance = attendance; // Adiciona a chamada
-        await gradebook.save();
+        await kindergarten.save();
 
-        res.status(201).json({ message: 'Chamada criada com sucesso', gradebook });
+        res.status(201).json({ message: 'Chamada criada com sucesso', kindergarten });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
 });
 
 // Rota para editar uma chamada
-router.put('/:gradebookId/term/:termId/lesson/:lessonId/attendance', authenticateToken, async (req, res) => {
+router.put('/:kindergartenId/term/:termId/lesson/:lessonId/attendance', authenticateToken, async (req, res) => {
     const { attendance } = req.body; // Array atualizado
 
     try {
-        const gradebook = await Gradebook.findById(req.params.gradebookId)
+        const kindergarten = await Kindergarten.findById(req.params.kindergartenId)
             .populate('teacher', 'name') // Preenche o campo 'professor' com o nome do professor
-            .populate('subject', 'name')   // Preenche o campo 'subject' com o nome da matéria
             .populate('classroom', 'classroomType grade name shift') // Preenche o campo 'classroom' com o nome da turma
             .populate('school', '_id')  // Opcional, preenche o campo 'school' com o ID da escola (se necessário)
             .sort({ 'classroom.grade': 1, 'classroom.name': 1 });
 
-        if (!gradebook) {
-            return res.status(404).json({ message: 'Gradebook not found.' });
+        if (!kindergarten) {
+            return res.status(404).json({ message: 'Kindergarten not found.' });
         }
 
-        const term = gradebook.terms.id(req.params.termId);
+        const term = kindergarten.terms.id(req.params.termId);
         if (!term) {
             return res.status(404).json({ message: 'Term not found.' });
         }
@@ -328,29 +318,29 @@ router.put('/:gradebookId/term/:termId/lesson/:lessonId/attendance', authenticat
         }
 
         lesson.attendance = attendance; // Atualiza a chamada
-        await gradebook.save();
+        await kindergarten.save();
 
-        res.status(200).json({ message: 'Attendance updated successfully.', gradebook });
+        res.status(200).json({ message: 'Attendance updated successfully.', kindergarten });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
 });
 
 // Rota que busca uma chamada
-router.get('/:gradebookId/term/:termId/lesson/:lessonId/attendance', authenticateToken, async (req, res) => {
+router.get('/:kindergartenId/term/:termId/lesson/:lessonId/attendance', authenticateToken, async (req, res) => {
     try {
-        const gradebook = await Gradebook.findById(req.params.gradebookId)
+        const kindergarten = await Kindergarten.findById(req.params.kindergartenId)
             .populate({
                 path: 'terms.lessons.attendance.studentId',
                 select: 'name', // Popula apenas o nome do aluno
                 options: { strictPopulate: false }, // Desativa o strictPopulate
             });
 
-        if (!gradebook) {
-            return res.status(404).json({ message: 'Gradebook not found.' });
+        if (!kindergarten) {
+            return res.status(404).json({ message: 'Kindergarten not found.' });
         }
 
-        const term = gradebook.terms.id(req.params.termId);
+        const term = kindergarten.terms.id(req.params.termId);
         if (!term) {
             return res.status(404).json({ message: 'Term not found.' });
         }
@@ -375,12 +365,12 @@ router.get('/:gradebookId/term/:termId/lesson/:lessonId/attendance', authenticat
 //---------STUDENT GRADES
 
 // GET: Buscar os dados de um bimestre específico em uma caderneta
-router.get('/:gradebookId/term/:termId/evaluations', authenticateToken, async (req, res) => {
+router.get('/:kindergartenId/term/:termId/evaluations', authenticateToken, async (req, res) => {
     try {
-        const { gradebookId, termId } = req.params;
+        const { kindergartenId, termId } = req.params;
 
         // Busca a caderneta e popula as informações necessárias
-        const gradebook = await Gradebook.findById(gradebookId)
+        const kindergarten = await Kindergarten.findById(kindergartenId)
             .populate({
                 path: 'classroom',
                 populate: {
@@ -391,18 +381,18 @@ router.get('/:gradebookId/term/:termId/evaluations', authenticateToken, async (r
             })
             .exec();
 
-        if (!gradebook) {
+        if (!kindergarten) {
             return res.status(404).json({ message: 'Caderneta não encontrada.' });
         }
 
         // Encontra o bimestre (termo) específico
-        const term = gradebook.terms.find((term) => term._id.toString() === termId);
+        const term = kindergarten.terms.find((term) => term._id.toString() === termId);
         if (!term) {
             return res.status(404).json({ message: 'Bimestre não encontrado.' });
         }
 
         // Lista os alunos da sala
-        const students = gradebook.classroom.students;
+        const students = kindergarten.classroom.students;
 
         // Mapear as avaliações existentes
         const evaluationsMap = new Map(
@@ -458,9 +448,9 @@ router.get('/:gradebookId/term/:termId/evaluations', authenticateToken, async (r
 });
 
 // PUT: Alterar as avaliações de todos os alunos no bimestre
-router.put('/:gradebookId/term/:termId/evaluations', authenticateToken, async (req, res) => {
+router.put('/:kindergartenId/term/:termId/evaluations', authenticateToken, async (req, res) => {
     try {
-        const { gradebookId, termId } = req.params;
+        const { kindergartenId, termId } = req.params;
         const evaluations = req.body.evaluations; // Array de avaliações
 
         if (!Array.isArray(evaluations)) {
@@ -468,12 +458,12 @@ router.put('/:gradebookId/term/:termId/evaluations', authenticateToken, async (r
         }
 
         // Buscar a caderneta e o bimestre especificado
-        const gradebook = await Gradebook.findById(gradebookId);
-        if (!gradebook) {
+        const kindergarten = await Kindergarten.findById(kindergartenId);
+        if (!kindergarten) {
             return res.status(404).json({ message: 'Caderneta não encontrada.' });
         }
 
-        const term = gradebook.terms.id(termId);
+        const term = kindergarten.terms.id(termId);
         if (!term) {
             return res.status(404).json({ message: 'Bimestre não encontrado.' });
         }
@@ -534,11 +524,11 @@ router.put('/:gradebookId/term/:termId/evaluations', authenticateToken, async (r
 
         if (hasChanges) {
             term.markModified('studentEvaluations'); // Força o Mongoose a reconhecer a mudança
-            await gradebook.save();
+            await kindergarten.save();
         }
 
         // Retornar o array de avaliações atualizado
-        const updatedEvaluations = gradebook.terms.id(termId).studentEvaluations;
+        const updatedEvaluations = kindergarten.terms.id(termId).studentEvaluations;
 
         res.status(200).json({
             message: 'Avaliações atualizadas com sucesso.',
@@ -551,12 +541,12 @@ router.put('/:gradebookId/term/:termId/evaluations', authenticateToken, async (r
 });
 
 // GET: Rota que busca o Registro geral de atividade
-router.get('/:gradebookId/learning-record', authenticateToken, async (req, res) => {
+router.get('/:kindergartenId/learning-record', authenticateToken, async (req, res) => {
     try {
-        const { gradebookId } = req.params;
+        const { kindergartenId } = req.params;
 
-        // Encontrar o gradebook e fazer o populate nos campos necessários
-        const gradebook = await Gradebook.findById(gradebookId)
+        // Encontrar o kindergarten e fazer o populate nos campos necessários
+        const kindergarten = await Kindergarten.findById(kindergartenId)
             .populate({
                 path: 'classroom',
                 populate: {
@@ -573,18 +563,18 @@ router.get('/:gradebookId/learning-record', authenticateToken, async (req, res) 
                 select: 'name cpf',
             });
 
-        if (!gradebook) {
-            return res.status(404).json({ message: 'Gradebook not found' });
+        if (!kindergarten) {
+            return res.status(404).json({ message: 'Kindergarten not found' });
         }
 
-        if (!gradebook.classroom || !gradebook.classroom.students) {
+        if (!kindergarten.classroom || !kindergarten.classroom.students) {
             return res.status(404).json({ message: 'No students found for this classroom' });
         }
 
         // Calcular o registro anual
-        const learningRecord = gradebook.classroom.students.map((student) => {
+        const learningRecord = kindergarten.classroom.students.map((student) => {
             // Total de faltas
-            const totalAbsences = gradebook.terms.reduce((absenceSum, term) => {
+            const totalAbsences = kindergarten.terms.reduce((absenceSum, term) => {
                 const lessons = term.lessons || [];
                 const absencesInTerm = lessons.reduce((lessonAbsences, lesson) => {
                     const attendanceRecord = lesson.attendance.find(
@@ -596,7 +586,7 @@ router.get('/:gradebookId/learning-record', authenticateToken, async (req, res) 
             }, 0);
 
             // Médias bimestrais
-            const bimonthlyAverages = gradebook.terms.map((term) => {
+            const bimonthlyAverages = kindergarten.terms.map((term) => {
                 const evaluation = term.studentEvaluations.find(
                     (ev) => ev.student._id.toString() === student._id.toString()
                 );

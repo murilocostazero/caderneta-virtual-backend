@@ -21,6 +21,7 @@ const schoolSubject = require('./routes/schoolSubject.route');
 const classroom = require('./routes/classroom.route');
 const student = require('./routes/student.route');
 const gradebook = require('./routes/gradebook.route');
+const kindergarten = require('./routes/kindergarten.route');
 
 // Usar as rotas
 app.use('/', userRoute);
@@ -29,10 +30,11 @@ app.use('/subject', schoolSubject);
 app.use('/classroom', classroom);
 app.use('/student', student);
 app.use('/gradebook', gradebook);
+app.use('/kindergarten', kindergarten);
 
 // Iniciar o servidor
 app.listen(process.env.PORT, () => {
-    console.log('Server is running on port 8000');
+    console.log('Server is running on port '+process.env.PORT);
 });
 
 module.exports = app;
