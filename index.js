@@ -22,6 +22,7 @@ const classroom = require('./routes/classroom.route');
 const student = require('./routes/student.route');
 const gradebook = require('./routes/gradebook.route');
 const kindergarten = require('./routes/kindergarten.route');
+const experienceField = require('./routes/experienceField.route');
 
 // Usar as rotas
 app.use('/', userRoute);
@@ -31,6 +32,7 @@ app.use('/classroom', classroom);
 app.use('/student', student);
 app.use('/gradebook', gradebook);
 app.use('/kindergarten', kindergarten);
+app.use('/experience-field', experienceField);
 
 // Iniciar o servidor
 app.listen(process.env.PORT, () => {

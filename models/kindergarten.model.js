@@ -21,7 +21,7 @@ const KindergartenEvaluationSchema = new Schema({
     bnccCode: { type: String, required: true }, // Ex: "EI02EF02"
     status: { 
         type: String, 
-        enum: ['Desenvolveu', 'Em desenvolvimento', 'Ainda não desenvolveu'], 
+        enum: ['developed', 'under-development', 'not-yet'], 
         required: true 
     },
     observations: String, // Comentário do professor sobre o desenvolvimento da criança
