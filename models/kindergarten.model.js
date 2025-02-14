@@ -14,17 +14,25 @@ const LessonSchema = new Schema({
     attendance: [AttendanceSchema]
 });
 
-// Esquema de Avaliação Infantil (qualitativa)
-const KindergartenEvaluationSchema = new Schema({
-    student: { type: Schema.Types.ObjectId, ref: 'Student', required: true },
-    fieldOfExperience: { type: String, required: true }, // Ex: "Escuta, fala, pensamento e imaginação"
-    bnccCode: { type: String, required: true }, // Ex: "EI02EF02"
-    status: { 
-        type: String, 
-        enum: ['developed', 'under-development', 'not-yet'], 
-        required: true 
+// Esquema de Avaliação por Campo de Experiência
+const EvaluationSchema = new Schema({
+    fieldName: { type: String, required: true }, // Nome do campo de experiência
+    evaluationCriteria: {
+        type: String,
+        enum: ['developed', 'under-development', 'not-yet'],
+        required: true
+    }
+});
+
+// Esquema de Avaliação por Aluno
+const StudentEvaluationSchema = new Schema({
+    student: {
+        _id: { type: Schema.Types.ObjectId, ref: 'Student', required: true },
+        name: { type: String, required: true },
+        cpf: { type: String, required: true }
     },
-    observations: String, // Comentário do professor sobre o desenvolvimento da criança
+    evaluations: [EvaluationSchema], // Lista de avaliações do aluno
+    totalAbsences: { type: Number, default: 0 } // Total de faltas no bimestre
 });
 
 // Esquema de Período (Bimestre, Trimestre, Semestre)
@@ -33,7 +41,7 @@ const TermSchema = new Schema({
     startDate: { type: Date, required: true },
     endDate: { type: Date, required: true },
     lessons: [LessonSchema], // Aulas ministradas
-    studentEvaluations: [KindergartenEvaluationSchema] // Avaliações qualitativas
+    studentEvaluations: [StudentEvaluationSchema] // Avaliações qualitativas
 });
 
 // Esquema do Diário Infantil (Kindergarten)

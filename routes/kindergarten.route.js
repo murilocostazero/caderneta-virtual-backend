@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Kindergarten = require('../models/kindergarten.model');
 const Student = require('../models/student.model');
+const ExperienceField = require('../models/experienceField.model');
 const { authenticateToken } = require('../utilities');
 
 // 1. Rota que busca um kindergarten por ID
@@ -45,7 +46,7 @@ router.get('/school/:schoolId', authenticateToken, async (req, res) => {
             .populate('teacher', 'name') // Preenche o campo 'professor' com o nome do professor
             .populate('classroom', 'classroomType grade name shift') // Preenche o campo 'classroom' com o nome da turma
             .populate('school', '_id')  // Opcional, preenche o campo 'school' com o ID da escola (se necessário)
-            .populate('terms.studentEvaluations.student', 'name') // Nome do aluno dentro das avaliações
+            .populate('terms.studentEvaluations.student.name', 'name') // Nome do aluno dentro das avaliações
             .sort({ 'classroom.grade': 1, 'classroom.name': 1 });
 
         res.status(200).json(kindergartens);
@@ -369,81 +370,23 @@ router.get('/:kindergartenId/term/:termId/evaluations', authenticateToken, async
     try {
         const { kindergartenId, termId } = req.params;
 
-        // Busca a caderneta e popula as informações necessárias
-        const kindergarten = await Kindergarten.findById(kindergartenId)
-            .populate({
-                path: 'classroom',
-                populate: {
-                    path: 'students',
-                    select: 'name cpf _id', // Popula apenas o nome dos alunos
-                    strictPopulate: false, // Adicionando a opção para evitar o erro
-                },
-            })
-            .exec();
-
-        if (!kindergarten) {
-            return res.status(404).json({ message: 'Caderneta não encontrada.' });
+        // Buscar o diário escolar
+        const gradebook = await Kindergarten.findById(kindergartenId);
+        if (!gradebook) {
+            return res.status(404).json({ message: "Diário não encontrado" });
         }
 
-        // Encontra o bimestre (termo) específico
-        const term = kindergarten.terms.find((term) => term._id.toString() === termId);
+        // Buscar o bimestre correto dentro do diário
+        const term = gradebook.terms.id(termId);
         if (!term) {
-            return res.status(404).json({ message: 'Bimestre não encontrado.' });
+            return res.status(404).json({ message: "Bimestre não encontrado" });
         }
 
-        // Lista os alunos da sala
-        const students = kindergarten.classroom.students;
-
-        // Mapear as avaliações existentes
-        const evaluationsMap = new Map(
-            term.studentEvaluations.map((evaluation) => [
-                evaluation.student.toString(),
-                evaluation,
-            ])
-        );
-
-        // Montar os dados para a resposta com o cálculo das faltas
-        const evaluations = await Promise.all(
-            students.map(async (student) => {
-                const evaluation = evaluationsMap.get(student._id.toString()) || {};
-
-                // Calcular o total de faltas
-                let totalAbsences = 0;
-                for (const lesson of term.lessons) {
-                    const attendance = lesson.attendance.find(
-                        (entry) => String(entry.studentId) === String(student._id)
-                    );
-
-                    if (attendance && !attendance.present) {
-                        totalAbsences++;
-                    }
-                }
-
-                // Retorna os dados do aluno, incluindo as avaliações e as faltas
-                return {
-                    student: {
-                        name: student.name,
-                        _id: student._id,
-                        cpf: student.cpf
-                    },
-                    monthlyExam: evaluation.monthlyExam || 0,
-                    bimonthlyExam: evaluation.bimonthlyExam || 0,
-                    qualitativeAssessment: evaluation.qualitativeAssessment || 0,
-                    bimonthlyGrade: evaluation.bimonthlyGrade || 0,
-                    bimonthlyRecovery: evaluation.bimonthlyRecovery || 0,
-                    bimonthlyAverage: evaluation.bimonthlyAverage || 0,
-                    totalAbsences: totalAbsences, // Total de faltas calculado
-                };
-            })
-        );
-
-        // Ordenar os alunos em ordem alfabética pelo nome
-        evaluations.sort((a, b) => a.student.name.localeCompare(b.student.name));
-
-        res.status(200).json(evaluations);
+        // Retornar as avaliações do bimestre
+        res.status(200).json({ evaluations: term.studentEvaluations });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Erro ao buscar avaliações.' });
+        res.status(500).json({ message: 'Erro ao buscar avaliações.', error: error.message });
     }
 });
 
@@ -451,92 +394,67 @@ router.get('/:kindergartenId/term/:termId/evaluations', authenticateToken, async
 router.put('/:kindergartenId/term/:termId/evaluations', authenticateToken, async (req, res) => {
     try {
         const { kindergartenId, termId } = req.params;
-        const evaluations = req.body.evaluations; // Array de avaliações
+        const { evaluations } = req.body; // Array de avaliações
 
-        if (!Array.isArray(evaluations)) {
-            return res.status(400).json({ message: 'O corpo da requisição deve conter um array de avaliações.' });
+        // Buscar o diário escolar
+        const gradebook = await Kindergarten.findById(kindergartenId);
+        if (!gradebook) {
+            return res.status(404).json({ message: "Diário não encontrado" });
         }
 
-        // Buscar a caderneta e o bimestre especificado
-        const kindergarten = await Kindergarten.findById(kindergartenId);
-        if (!kindergarten) {
-            return res.status(404).json({ message: 'Caderneta não encontrada.' });
-        }
-
-        const term = kindergarten.terms.id(termId);
+        // Buscar o bimestre correto dentro do diário
+        const term = gradebook.terms.id(termId);
         if (!term) {
-            return res.status(404).json({ message: 'Bimestre não encontrado.' });
+            return res.status(404).json({ message: "Bimestre não encontrado" });
         }
 
-        // Se studentEvaluations não existir, inicializa como um array vazio
-        if (!term.studentEvaluations) {
-            term.studentEvaluations = [];
-        }
+        // Percorrer cada avaliação enviada do front
+        evaluations.forEach((newEvaluation) => {
+            const { student, evaluations, totalAbsences } = newEvaluation;
 
-        let hasChanges = false; // Flag para saber se houve mudanças
-
-        // Atualizar as avaliações dos alunos no bimestre
-        evaluations.forEach((evaluation) => {
-            let studentEvaluation = term.studentEvaluations.find(
-                (entry) => String(entry.student._id) === String(evaluation.student._id)
+            // Verifica se o aluno já tem avaliação nesse bimestre
+            const existingStudentEvaluation = term.studentEvaluations.find(
+                (entry) => String(entry.student._id) === String(student._id)
             );
 
-            if (!studentEvaluation) {
-                studentEvaluation = term.studentEvaluations.create({
-                    student: {
-                        name: evaluation.student.name,
-                        _id: evaluation.student._id,
-                        cpf: evaluation.student.cpf
-                    },
-                    monthlyExam: evaluation.monthlyExam,
-                    bimonthlyExam: evaluation.bimonthlyExam,
-                    qualitativeAssessment: evaluation.qualitativeAssessment,
-                    bimonthlyGrade: evaluation.bimonthlyGrade,
-                    bimonthlyRecovery: evaluation.bimonthlyRecovery,
-                    bimonthlyAverage: evaluation.bimonthlyAverage,
-                    totalAbsences: evaluation.totalAbsences
+            if (existingStudentEvaluation) {
+                // Atualiza as avaliações existentes do aluno
+                evaluations.forEach((newEval) => {
+                    const existingEvalIndex = existingStudentEvaluation.evaluations.findIndex(
+                        (eval) => eval.fieldName === newEval.fieldName
+                    );
+
+                    if (existingEvalIndex !== -1) {
+                        // Se a avaliação do campo já existe, atualiza o status
+                        existingStudentEvaluation.evaluations[existingEvalIndex].evaluationCriteria = newEval.evaluationCriteria;
+                    } else {
+                        // Se não existe, adiciona um novo campo de experiência
+                        existingStudentEvaluation.evaluations.push(newEval);
+                    }
                 });
 
-                term.studentEvaluations.push(studentEvaluation);
-                hasChanges = true;
+                // Atualiza o total de faltas do aluno
+                existingStudentEvaluation.totalAbsences = totalAbsences;
+
             } else {
-                // Atualiza apenas se houver mudanças nos valores
-                if (
-                    studentEvaluation.monthlyExam !== evaluation.monthlyExam ||
-                    studentEvaluation.bimonthlyExam !== evaluation.bimonthlyExam ||
-                    studentEvaluation.qualitativeAssessment !== evaluation.qualitativeAssessment ||
-                    studentEvaluation.bimonthlyGrade !== evaluation.bimonthlyGrade ||
-                    studentEvaluation.bimonthlyRecovery !== evaluation.bimonthlyRecovery ||
-                    studentEvaluation.bimonthlyAverage !== evaluation.bimonthlyAverage ||
-                    studentEvaluation.totalAbsences !== evaluation.totalAbsences
-                ) {
-                    studentEvaluation.monthlyExam = evaluation.monthlyExam;
-                    studentEvaluation.bimonthlyExam = evaluation.bimonthlyExam;
-                    studentEvaluation.qualitativeAssessment = evaluation.qualitativeAssessment;
-                    studentEvaluation.bimonthlyGrade = evaluation.bimonthlyGrade;
-                    studentEvaluation.bimonthlyRecovery = evaluation.bimonthlyRecovery;
-                    studentEvaluation.bimonthlyAverage = evaluation.bimonthlyAverage;
-                    studentEvaluation.totalAbsences = evaluation.totalAbsences;
-                    hasChanges = true;
-                }
+                // Se o aluno ainda não tem avaliações nesse bimestre, adiciona tudo de uma vez
+                term.studentEvaluations.push({
+                    student,
+                    evaluations,
+                    totalAbsences
+                });
             }
         });
 
-        if (hasChanges) {
-            term.markModified('studentEvaluations'); // Força o Mongoose a reconhecer a mudança
-            await kindergarten.save();
-        }
+        // Salvar as alterações no banco
+        await gradebook.save();
 
-        // Retornar o array de avaliações atualizado
-        const updatedEvaluations = kindergarten.terms.id(termId).studentEvaluations;
+        const updatedEvaluations = gradebook.terms.id(termId).studentEvaluations;
 
-        res.status(200).json({
-            message: 'Avaliações atualizadas com sucesso.',
-            evaluations: updatedEvaluations
-        });
+        res.status(200).json({ message: 'Avaliações atualizadas com sucesso.', evaluations: updatedEvaluations });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Erro ao atualizar as avaliações.' });
+        res.status(500).json({ message: 'Erro ao atualizar avaliações.', error: error.message });
     }
 });
 
