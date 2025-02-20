@@ -630,4 +630,14 @@ router.get('/:gradebookId/learning-record', authenticateToken, async (req, res) 
     }
 });
 
+router.delete('/:id', authenticateToken, async (req, res) => {
+    try {
+        const gradebook = await Gradebook.findByIdAndDelete(req.params.id);
+        if (!gradebook) return res.status(404).json({ message: 'Caderneta não encontrada' });
+        res.status(200).json({ message: 'Caderneta removida com sucesso.' });
+    } catch (error) {
+        res.status(500).json({ message: 'Erro ao remover caderneta.', error });
+    }
+});
+
 module.exports = router;
