@@ -166,6 +166,33 @@ router.put('/:gradebookId/term/:termId', authenticateToken, async (req, res) => 
     }
 });
 
+router.delete('/:gradebookId/term/:termId', authenticateToken, async (req, res) => {
+    try {
+        const { gradebookId, termId } = req.params;
+
+        // Buscar o diário escolar (Gradebook)
+        const gradebook = await Gradebook.findById(gradebookId);
+        if (!gradebook) {
+            return res.status(404).json({ message: "Gradebook não encontrado" });
+        }
+
+        // Filtrar e remover o Term pelo ID
+        const termIndex = gradebook.terms.findIndex(term => term._id.toString() === termId);
+        if (termIndex === -1) {
+            return res.status(404).json({ message: "Bimestre não encontrado" });
+        }
+
+        gradebook.terms.splice(termIndex, 1); // Remove o Term da lista
+
+        await gradebook.save(); // Salva as alterações
+
+        res.status(200).json({ message: "Bimestre removido com sucesso!", gradebook: gradebook });
+    } catch (err) {
+        res.status(500).json({ message: "Erro ao remover o bimestre", error: err.message });
+    }
+});
+
+
 // 8. Rota para adicionar uma nova Lesson
 router.post('/:gradebookId/term/:termId/lesson', authenticateToken, async (req, res) => {
     const { topic, date } = req.body;
