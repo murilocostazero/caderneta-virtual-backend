@@ -27,10 +27,9 @@ router.get('/:id', authenticateToken, async (req, res) => {
 router.get('/teacher/:teacherId', authenticateToken, async (req, res) => {
     try {
         const kindergartens = await Kindergarten.find({ teacher: req.params.teacherId })
-            .populate('teacher', 'name') // Preenche o campo 'professor' com o nome do professor
-            .populate('classroom', 'classroomType grade name shift') // Preenche o campo 'classroom' com o nome da turma
-            .populate('school', '_id')  // Opcional, preenche o campo 'school' com o ID da escola (se necessário)
-            .populate('terms.studentEvaluations.student', 'name') // Nome do aluno dentro das avaliações
+            .populate('teacher', 'name') // Popula o campo 'teacher' com o nome do professor
+            .populate('classroom', 'classroomType grade name shift') // Popula 'classroom'
+            .populate('school', '_id')  // Popula 'school' com o ID da escola
             .sort({ 'classroom.grade': 1, 'classroom.name': 1 });
 
         res.status(200).json(kindergartens);
@@ -523,7 +522,7 @@ router.get('/:kindergartenId/general-record', authenticateToken, async (req, res
         gradebook.terms.forEach(term => {
             term.studentEvaluations.forEach(studentEval => {
                 const studentId = String(studentEval.student._id);
-                
+
                 if (!finalEvaluations[studentId]) {
                     finalEvaluations[studentId] = {
                         student: studentEval.student,
@@ -545,10 +544,10 @@ router.get('/:kindergartenId/general-record', authenticateToken, async (req, res
                     } else {
                         // Comparar com o critério anterior e manter o mais avançado
                         const prevCriteria = finalEvaluations[studentId].evaluations[fieldName];
-                        finalEvaluations[studentId].evaluations[fieldName] = 
-                            criteriaOrder.indexOf(currentCriteria) > criteriaOrder.indexOf(prevCriteria) 
-                            ? currentCriteria 
-                            : prevCriteria;
+                        finalEvaluations[studentId].evaluations[fieldName] =
+                            criteriaOrder.indexOf(currentCriteria) > criteriaOrder.indexOf(prevCriteria)
+                                ? currentCriteria
+                                : prevCriteria;
                     }
                 });
             });
