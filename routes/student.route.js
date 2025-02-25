@@ -154,7 +154,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
         }
 
         // Decrementa o total de alunos na turma
-        await Classroom.findByIdAndUpdate(student.classroom, {
+        await Classroom.findByIdAndUpdate(deletedStudent.classroom, {
             $inc: { totalStudents: -1 }
         });
 
