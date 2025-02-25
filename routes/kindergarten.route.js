@@ -160,6 +160,33 @@ router.put('/:kindergartenId/term/:termId', authenticateToken, async (req, res) 
     }
 });
 
+//Deletar um term
+router.delete('/:kindergartenId/term/:termId', authenticateToken, async (req, res) => {
+    try {
+        const { kindergartenId, termId } = req.params;
+
+        // Buscar o diário escolar (Gradebook)
+        const kindergarten = await Kindergarten.findById(kindergartenId);
+        if (!kindergarten) {
+            return res.status(404).json({ message: "Kindergarten não encontrado" });
+        }
+
+        // Filtrar e remover o Term pelo ID
+        const termIndex = kindergarten.terms.findIndex(term => term._id.toString() === termId);
+        if (termIndex === -1) {
+            return res.status(404).json({ message: "Bimestre não encontrado" });
+        }
+
+        kindergarten.terms.splice(termIndex, 1); // Remove o Term da lista
+
+        await kindergarten.save(); // Salva as alterações
+
+        res.status(200).json({ message: "Bimestre removido com sucesso!", kindergarten: kindergarten });
+    } catch (err) {
+        res.status(500).json({ message: "Erro ao remover o bimestre", error: err.message });
+    }
+});
+
 // 8. Rota para adicionar uma nova Lesson
 router.post('/:kindergartenId/term/:termId/lesson', authenticateToken, async (req, res) => {
     const { topic, date } = req.body;
@@ -241,15 +268,12 @@ router.delete('/:kindergartenId/term/:termId/lesson/:lessonId', authenticateToke
             return res.status(404).json({ message: 'Term not found.' });
         }
 
-        const lesson = term.lessons.id(req.params.lessonId);
-        if (!lesson) {
-            return res.status(404).json({ message: 'Lesson not found.' });
-        }
+        // Removendo a Lesson do array de lessons
+        term.lessons.pull(req.params.lessonId);
 
-        lesson.remove();
         await kindergarten.save();
 
-        res.status(200).json({ message: 'Lesson deleted successfully.' });
+        res.status(200).json({ message: 'Lesson deleted successfully.', kindergarten });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -557,6 +581,16 @@ router.get('/:kindergartenId/general-record', authenticateToken, async (req, res
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Erro ao buscar registro geral.', error: error.message });
+    }
+});
+
+router.delete('/:id', authenticateToken, async (req, res) => {
+    try {
+        const kindergarten = await Kindergarten.findByIdAndDelete(req.params.id);
+        if (!kindergarten) return res.status(404).json({ message: 'Caderneta não encontrada' });
+        res.status(200).json({ message: 'Caderneta removida com sucesso.' });
+    } catch (error) {
+        res.status(500).json({ message: 'Erro ao remover caderneta.', error });
     }
 });
 

@@ -166,6 +166,7 @@ router.put('/:gradebookId/term/:termId', authenticateToken, async (req, res) => 
     }
 });
 
+//Deletar um term
 router.delete('/:gradebookId/term/:termId', authenticateToken, async (req, res) => {
     try {
         const { gradebookId, termId } = req.params;
@@ -276,15 +277,12 @@ router.delete('/:gradebookId/term/:termId/lesson/:lessonId', authenticateToken, 
             return res.status(404).json({ message: 'Term not found.' });
         }
 
-        const lesson = term.lessons.id(req.params.lessonId);
-        if (!lesson) {
-            return res.status(404).json({ message: 'Lesson not found.' });
-        }
+        // Removendo a Lesson do array de lessons
+        term.lessons.pull(req.params.lessonId);
 
-        lesson.remove();
         await gradebook.save();
 
-        res.status(200).json({ message: 'Lesson deleted successfully.' });
+        res.status(200).json({ message: 'Lesson deleted successfully.', gradebook });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
