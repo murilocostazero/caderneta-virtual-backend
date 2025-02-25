@@ -48,6 +48,10 @@ const StudentSchema = new Schema({
             trim: true
         }
     },
+    studentSituation: {
+        situation: { type: String },
+        since: { type: Date }
+    },
     classroom: {
         type: Schema.Types.ObjectId,
         ref: 'Classroom',

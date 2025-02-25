@@ -33,7 +33,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
 
 // 3. Rota que cadastra 1 novo aluno
 router.post('/', authenticateToken, async (req, res) => {
-    const { name, cpf, birthDate, contact, address, guardian, classroom } = req.body;
+    const { name, cpf, birthDate, contact, address, guardian, studentSituation, classroom } = req.body;
 
     try {
         // Verifica se já existe um aluno com o mesmo CPF
@@ -44,7 +44,7 @@ router.post('/', authenticateToken, async (req, res) => {
         }
 
         // Cria o novo aluno
-        const newStudent = new Student({ name, cpf, birthDate, contact, address, guardian, classroom });
+        const newStudent = new Student({ name, cpf, birthDate, contact, address, studentSituation, guardian, classroom });
         const savedStudent = await newStudent.save();
 
         // Atualiza a turma adicionando o novo aluno no array 'students'
@@ -60,7 +60,7 @@ router.post('/', authenticateToken, async (req, res) => {
 
 // 4. Rota que altera os dados de 1 aluno
 router.put('/:id', authenticateToken, async (req, res) => {
-    const { name, cpf, birthDate, contact, address, guardian } = req.body;
+    const { name, cpf, birthDate, contact, address, studentSituation, guardian } = req.body;
     const studentId = req.params.id;
 
     try {
@@ -73,7 +73,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
 
         const updatedStudent = await Student.findByIdAndUpdate(
             studentId,
-            { name, cpf, birthDate, contact, address, guardian },
+            { name, cpf, birthDate, contact, address, studentSituation, guardian },
             { new: true }
         );
 

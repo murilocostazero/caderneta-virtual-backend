@@ -367,7 +367,7 @@ router.get('/:gradebookId/term/:termId/lesson/:lessonId/attendance', authenticat
         const gradebook = await Gradebook.findById(req.params.gradebookId)
             .populate({
                 path: 'terms.lessons.attendance.studentId',
-                select: 'name', // Popula apenas o nome do aluno
+                select: 'name studentSituation', // Popula apenas o nome do aluno
                 options: { strictPopulate: false }, // Desativa o strictPopulate
             });
 
