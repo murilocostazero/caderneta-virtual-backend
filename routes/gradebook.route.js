@@ -172,7 +172,13 @@ router.delete('/:gradebookId/term/:termId', authenticateToken, async (req, res) 
         const { gradebookId, termId } = req.params;
 
         // Buscar o diário escolar (Gradebook)
-        const gradebook = await Gradebook.findById(gradebookId);
+        const gradebook = await Gradebook.findById(gradebookId)
+            .populate('teacher', 'name') // Popula o campo 'teacher' com o nome do professor
+            .populate('classroom', 'classroomType grade name shift') // Popula 'classroom'
+            .populate('school', '_id')  // Popula 'school' com o ID da escola
+            .populate('subject', 'name')
+            .sort({ 'classroom.grade': 1, 'classroom.name': 1 });
+
         if (!gradebook) {
             return res.status(404).json({ message: "Gradebook não encontrado" });
         }
@@ -267,7 +273,13 @@ router.put('/:gradebookId/term/:termId/lesson/:lessonId', authenticateToken, asy
 // Rota para excluir uma Lesson
 router.delete('/:gradebookId/term/:termId/lesson/:lessonId', authenticateToken, async (req, res) => {
     try {
-        const gradebook = await Gradebook.findById(req.params.gradebookId);
+        const gradebook = await Gradebook.findById(req.params.gradebookId)
+            .populate('teacher', 'name') // Popula o campo 'teacher' com o nome do professor
+            .populate('classroom', 'classroomType grade name shift') // Popula 'classroom'
+            .populate('school', '_id')  // Popula 'school' com o ID da escola
+            .populate('subject', 'name')
+            .sort({ 'classroom.grade': 1, 'classroom.name': 1 });
+
         if (!gradebook) {
             return res.status(404).json({ message: 'Gradebook not found.' });
         }
