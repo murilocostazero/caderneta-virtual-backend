@@ -170,7 +170,6 @@ router.delete('/:kindergartenId/term/:termId', authenticateToken, async (req, re
             .populate('teacher', 'name') // Popula o campo 'teacher' com o nome do professor
             .populate('classroom', 'classroomType grade name shift') // Popula 'classroom'
             .populate('school', '_id')  // Popula 'school' com o ID da escola
-            .populate('subject', 'name')
             .sort({ 'classroom.grade': 1, 'classroom.name': 1 });
 
         if (!kindergarten) {
@@ -268,7 +267,6 @@ router.delete('/:kindergartenId/term/:termId/lesson/:lessonId', authenticateToke
             .populate('teacher', 'name') // Popula o campo 'teacher' com o nome do professor
             .populate('classroom', 'classroomType grade name shift') // Popula 'classroom'
             .populate('school', '_id')  // Popula 'school' com o ID da escola
-            .populate('subject', 'name')
             .sort({ 'classroom.grade': 1, 'classroom.name': 1 });
 
         if (!kindergarten) {
