@@ -397,14 +397,22 @@ router.get('/:kindergartenId/term/:termId/lesson/:lessonId/attendance', authenti
 });
 
 //---------STUDENT GRADES
-
-// GET: Buscar os dados de um bimestre específico em uma caderneta
 router.get('/:kindergartenId/term/:termId/evaluations', authenticateToken, async (req, res) => {
     try {
         const { kindergartenId, termId } = req.params;
 
-        // Buscar o diário escolar
-        const gradebook = await Kindergarten.findById(kindergartenId).populate('classroom');
+        // Buscar o diário escolar e popular a turma
+        const gradebook = await Kindergarten.findById(kindergartenId)
+            .populate({
+                path: 'classroom',
+                populate: {
+                    path: 'students',
+                    select: 'name cpf _id',
+                    strictPopulate: false,
+                },
+            })
+            .exec();
+
         if (!gradebook) {
             return res.status(404).json({ message: "Diário não encontrado" });
         }
@@ -415,8 +423,8 @@ router.get('/:kindergartenId/term/:termId/evaluations', authenticateToken, async
             return res.status(404).json({ message: "Bimestre não encontrado" });
         }
 
-        // Buscar todos os alunos da turma
-        const students = await Student.find({ classroom: gradebook.classroom._id });
+        // Lista de alunos da sala
+        const students = gradebook.classroom.students;
 
         // Buscar todos os campos de experiência disponíveis
         const experienceFields = await ExperienceField.find({ school: gradebook.school });
@@ -428,41 +436,43 @@ router.get('/:kindergartenId/term/:termId/evaluations', authenticateToken, async
         });
 
         // Construir a lista final de avaliações garantindo que todos os alunos tenham registros
-        const formattedEvaluations = students.map(student => {
-            const studentEval = existingEvaluations.get(String(student._id));
+        const formattedEvaluations = await Promise.all(
+            students.map(async (student) => {
+                const studentEval = existingEvaluations.get(String(student._id));
 
-            if (studentEval) {
-                // Se o aluno já tem avaliações registradas, usamos as existentes
+                // Calcular total de faltas
+                let totalAbsences = 0;
+                for (const lesson of term.lessons) {
+                    const attendance = lesson.attendance.find(
+                        (entry) => String(entry.studentId) === String(student._id)
+                    );
+
+                    if (attendance && !attendance.present) {
+                        totalAbsences++;
+                    }
+                }
+
                 return {
                     student: {
                         _id: student._id,
                         name: student.name,
                         cpf: student.cpf
                     },
-                    evaluations: studentEval.evaluations,
-                    totalAbsences: studentEval.totalAbsences
+                    evaluations: studentEval 
+                        ? studentEval.evaluations 
+                        : experienceFields.map(field => ({
+                            fieldName: field.name,
+                            evaluationCriteria: "not-yet"
+                        })), // Adiciona os experienceFields corretamente
+                    totalAbsences: totalAbsences,
                 };
-            } else {
-                // Se não há avaliação registrada, criamos com critérios "not-yet"
-                return {
-                    student: {
-                        _id: student._id,
-                        name: student.name,
-                        cpf: student.cpf
-                    },
-                    evaluations: experienceFields.map(field => ({
-                        fieldName: field.name,
-                        evaluationCriteria: "not-yet"
-                    })),
-                    totalAbsences: 0
-                };
-            }
-        });
+            })
+        );
 
         res.status(200).json({ evaluations: formattedEvaluations });
 
     } catch (error) {
-        console.error(error);
+        console.error("Erro ao buscar avaliações:", error);
         res.status(500).json({ message: 'Erro ao buscar avaliações.', error: error.message });
     }
 });
