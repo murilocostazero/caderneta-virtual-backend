@@ -422,14 +422,19 @@ router.get('/:gradebookId/term/:termId/evaluations', authenticateToken, async (r
                 path: 'classroom',
                 populate: {
                     path: 'students',
-                    select: 'name cpf _id', // Popula apenas o nome dos alunos
-                    strictPopulate: false, // Adicionando a opção para evitar o erro
+                    select: 'name cpf _id',
+                    strictPopulate: false,
                 },
             })
             .exec();
 
         if (!gradebook) {
             return res.status(404).json({ message: 'Caderneta não encontrada.' });
+        }
+
+        // Verifica se existem termos antes de tentar acessá-los
+        if (!gradebook.terms || !Array.isArray(gradebook.terms)) {
+            return res.status(404).json({ message: 'Nenhum bimestre encontrado na caderneta.' });
         }
 
         // Encontra o bimestre (termo) específico
@@ -439,7 +444,7 @@ router.get('/:gradebookId/term/:termId/evaluations', authenticateToken, async (r
         }
 
         // Lista os alunos da sala
-        const students = gradebook.classroom.students;
+        const students = gradebook.classroom.students || [];
 
         // Mapear as avaliações existentes
         const evaluationsMap = new Map(
@@ -456,17 +461,18 @@ router.get('/:gradebookId/term/:termId/evaluations', authenticateToken, async (r
 
                 // Calcular o total de faltas
                 let totalAbsences = 0;
-                for (const lesson of term.lessons) {
-                    const attendance = lesson.attendance.find(
-                        (entry) => String(entry.studentId) === String(student._id)
-                    );
+                if (term.lessons && Array.isArray(term.lessons)) {
+                    for (const lesson of term.lessons) {
+                        const attendance = lesson.attendance ? lesson.attendance.find(
+                            (entry) => String(entry.studentId) === String(student._id)
+                        ) : null;
 
-                    if (attendance && !attendance.present) {
-                        totalAbsences++;
+                        if (attendance && !attendance.present) {
+                            totalAbsences++;
+                        }
                     }
                 }
 
-                // Retorna os dados do aluno, incluindo as avaliações e as faltas
                 return {
                     student: {
                         name: student.name,
@@ -479,7 +485,7 @@ router.get('/:gradebookId/term/:termId/evaluations', authenticateToken, async (r
                     bimonthlyGrade: evaluation.bimonthlyGrade || 0,
                     bimonthlyRecovery: evaluation.bimonthlyRecovery || 0,
                     bimonthlyAverage: evaluation.bimonthlyAverage || 0,
-                    totalAbsences: totalAbsences, // Total de faltas calculado
+                    totalAbsences: totalAbsences,
                 };
             })
         );
@@ -489,8 +495,8 @@ router.get('/:gradebookId/term/:termId/evaluations', authenticateToken, async (r
 
         res.status(200).json(evaluations);
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Erro ao buscar avaliações.' });
+        console.error("Erro ao buscar avaliações:", error);
+        res.status(500).json({ message: 'Erro ao buscar avaliações.', error: error.message });
     }
 });
 
