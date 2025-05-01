@@ -1,11 +1,16 @@
 require('dotenv').config();
-// const config = require('./config.json');
 const mongoose = require('mongoose');
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 
 // Conectar ao banco de dados
-mongoose.connect(process.env.DB_CONFIG);
+mongoose.connect(process.env.DB_CONFIG, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+})
+.then(() => console.log('Conectado ao MongoDB'))
+.catch(err => console.error('Erro ao conectar ao MongoDB:', err));
 
 // Criar a aplicação express
 const app = express();
@@ -34,9 +39,18 @@ app.use('/gradebook', gradebook);
 app.use('/kindergarten', kindergarten);
 app.use('/experience-field', experienceField);
 
+// Servir arquivos estáticos do React
+app.use(express.static(path.join(__dirname, 'client/build')));
+
+// Rota wildcard para o React (SPA)
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
+});
+
 // Iniciar o servidor
-app.listen(process.env.PORT, () => {
-    console.log('Server is running on port '+process.env.PORT);
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
 });
 
 module.exports = app;
