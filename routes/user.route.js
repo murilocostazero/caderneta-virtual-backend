@@ -1,36 +1,39 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const bcrypt = require('bcrypt');
 const User = require('../models/user.model');
 const School = require('../models/school.model');
 const { authenticateToken } = require('../utilities');
 const router = express.Router();
+const transporter = require('../mailer');
 
 // Rota principal
 router.get('/', (req, res) => {
     res.json({ data: 'Olá mundo!' });
 });
 
-// Rota para criação de conta
 router.post('/create-account', async (req, res) => {
     try {
         const { name, email, password, userType } = req.body;
 
-        // Verifica se todos os campos obrigatórios estão presentes
         if (!name || !email || !password || !userType) {
             return res.status(400).json({ message: 'Email, senha e área de formação são obrigatórios.' });
         }
 
-        // Verifica se o e-mail já está em uso
         const existingUser = await User.findOne({ email });
         if (existingUser) {
             return res.status(400).json({ message: 'E-mail já está em uso.' });
         }
 
-        // Cria o novo usuário
+        // Hash da senha
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
         const user = new User({
             name,
             email,
-            password, // Certifique-se de hashear a senha antes de salvar
+            password: hashedPassword, // salva a senha criptografada
             userType,
         });
 
@@ -56,38 +59,49 @@ router.post('/create-account', async (req, res) => {
 router.post('/login', async (req, res) => {
     const { email, password } = req.body;
 
-    if (!email) {
-        return res.status(400).json({ err: true, message: 'Email é um campo obrigatório' });
+    if (!email || !password) {
+        return res.status(400).json({ err: true, message: 'Email e senha são obrigatórios.' });
     }
 
-    if (!password) {
-        return res.status(400).json({ err: true, message: 'Senha é um campo obrigatório' });
-    }
-
-    const userInfo = await User.findOne({ email: email });
-
+    const userInfo = await User.findOne({ email });
     if (!userInfo) {
         return res.status(400).json({ message: 'Usuário não encontrado' });
     }
 
-    if (userInfo.email == email && userInfo.password == password) {
-        const user = { user: userInfo };
-        const accessToken = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
-            expiresIn: '36000m'
-        });
+    const storedPassword = userInfo.password;
 
-        return res.json({
-            error: false,
-            message: 'Login completo',
-            email,
-            accessToken
-        });
+    let isPasswordValid = false;
+
+    if (storedPassword.startsWith('$2')) {
+        // Já é um hash bcrypt
+        isPasswordValid = await bcrypt.compare(password, storedPassword);
     } else {
-        return res.json({
-            error: true,
-            message: 'Credenciais inválidas'
-        });
+        // Ainda não é um hash, comparar direto (risco, mas necessário)
+        isPasswordValid = password === storedPassword;
+
+        if (isPasswordValid) {
+            // Atualiza para hash no login
+            const salt = await bcrypt.genSalt(10);
+            const hashedPassword = await bcrypt.hash(password, salt);
+            userInfo.password = hashedPassword;
+            await userInfo.save();
+        }
     }
+
+    if (!isPasswordValid) {
+        return res.status(401).json({ error: true, message: 'Credenciais inválidas' });
+    }
+
+    const accessToken = jwt.sign({ user: userInfo }, process.env.ACCESS_TOKEN_SECRET, {
+        expiresIn: '36000m'
+    });
+
+    return res.json({
+        error: false,
+        message: 'Login completo',
+        email,
+        accessToken
+    });
 });
 
 router.get('/get-user', authenticateToken, async (req, res) => {
@@ -319,6 +333,68 @@ router.put('/:id', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error(error);
         return res.status(500).json({ error: 'Erro ao atualizar usuário.' });
+    }
+});
+
+router.post('/forgot-password', async (req, res) => {
+    const { email } = req.body;
+
+    try {
+        const user = await User.findOne({ email });
+        if (!user) return res.status(404).json({ message: 'Usuário não encontrado' });
+
+        const token = crypto.randomBytes(32).toString('hex');
+        const expiration = Date.now() + 3600000; // 1 hora
+
+        user.resetPasswordToken = token;
+        user.resetPasswordExpires = expiration;
+        await user.save();
+
+        const resetLink = `https://caderneta-virtual-backend-bynwc.ondigitalocean.app/reset-password?token=${token}`;
+
+        await transporter.sendMail({
+            from: '"Caderneta Virtual" <cadernetavirtual0@gmail.com>',
+            to: user.email,
+            subject: 'Redefinição de senha',
+            html: `
+                <h3>Olá, ${user.name || 'usuário'}!</h3>
+                <p>Você solicitou uma redefinição de senha. Clique no link abaixo para criar uma nova senha:</p>
+                <a href="${resetLink}">Redefinir senha</a>
+                <p>Este link expira em 1 hora.</p>
+            `
+        });
+
+        res.status(200).json({ message: 'Link enviado para o e-mail cadastrado' });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Erro ao enviar e-mail' });
+    }
+});
+
+router.post('/reset-password', async (req, res) => {
+    const { token, newPassword } = req.body;
+
+    try {
+        const user = await User.findOne({
+            resetPasswordToken: token,
+            resetPasswordExpires: { $gt: Date.now() }
+        });
+
+        if (!user) return res.status(400).json({ message: 'Token inválido ou expirado' });
+
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(newPassword, salt);
+
+        user.resetPasswordToken = undefined;
+        user.resetPasswordExpires = undefined;
+        await user.save();
+
+        res.status(200).json({ message: 'Senha redefinida com sucesso' });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Erro ao redefinir a senha' });
     }
 });
 

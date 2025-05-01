@@ -15,10 +15,10 @@ const userSchema = new Schema({
 		required: true
 	},
 	cpf: {
-        type: String,
-        required: false,
-        unique: false // Certifique-se de que unique está definido como false ou omitido
-    },
+		type: String,
+		required: false,
+		unique: false // Certifique-se de que unique está definido como false ou omitido
+	},
 	phone: {
 		type: String,
 	},
@@ -44,6 +44,9 @@ const userSchema = new Schema({
 		ref: 'School',
 	},
 	subjects: [{ type: Schema.Types.ObjectId, ref: 'SchoolSubject' }],
+	resetPasswordToken: String,
+	resetPasswordExpires: Date
+
 });
 
 module.exports = mongoose.model('User', userSchema);
