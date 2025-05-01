@@ -350,7 +350,7 @@ router.post('/forgot-password', async (req, res) => {
         user.resetPasswordExpires = expiration;
         await user.save();
 
-        const resetLink = `https://caderneta-virtual-backend-bynwc.ondigitalocean.app/reset-password?token=${token}`;
+        const resetLink = `https://cadernetavirtual-phggv.ondigitalocean.app/reset-password?token=${token}`;
 
         await transporter.sendMail({
             from: '"Caderneta Virtual" <cadernetavirtual0@gmail.com>',
