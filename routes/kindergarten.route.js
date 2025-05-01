@@ -34,7 +34,18 @@ router.get('/teacher/:teacherId', authenticateToken, async (req, res) => {
             .populate('school', '_id')  // Popula 'school' com o ID da escola
             .sort({ 'classroom.grade': 1, 'classroom.name': 1 });
 
-        res.status(200).json(kindergartens);
+        // Ordenar as lessons dentro de cada term do gradebook
+        const sortedGradebooks = kindergartens.map(gradebook => {
+            gradebook.terms.forEach(term => {
+                if (term.lessons && Array.isArray(term.lessons)) {
+                    // Ordena por data (ou outro campo, como 'index' se tiver)
+                    term.lessons.sort((a, b) => new Date(a.date) - new Date(b.date));
+                }
+            });
+            return gradebook;
+        });
+
+        res.status(200).json(sortedGradebooks);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -50,7 +61,18 @@ router.get('/school/:schoolId', authenticateToken, async (req, res) => {
             .populate('terms.studentEvaluations.student.name', 'name') // Nome do aluno dentro das avaliações
             .sort({ 'classroom.grade': 1, 'classroom.name': 1 });
 
-        res.status(200).json(kindergartens);
+        // Ordenar as lessons dentro de cada term do gradebook
+        const sortedGradebooks = kindergartens.map(gradebook => {
+            gradebook.terms.forEach(term => {
+                if (term.lessons && Array.isArray(term.lessons)) {
+                    // Ordena por data (ou outro campo, como 'index' se tiver)
+                    term.lessons.sort((a, b) => new Date(a.date) - new Date(b.date));
+                }
+            });
+            return gradebook;
+        });
+
+        res.status(200).json(sortedGradebooks);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -302,7 +324,15 @@ router.delete('/:kindergartenId/term/:termId/lesson/:lessonId', authenticateToke
 
         await kindergarten.save();
 
-        res.status(200).json({ message: 'Lesson deleted successfully.', kindergarten });
+        // Recarrega o gradebook com os populates
+        const updatedGradebook = await Kindergarten.findById(req.params.kindergartenId)
+            .populate('teacher', 'name')
+            .populate('classroom', 'classroomType grade name shift')
+            .populate('school', '_id');
+
+        sortLessonsInGradebook(updatedGradebook);
+
+        res.status(200).json({ message: 'Lesson deleted successfully.', kindergarten: updatedGradebook });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }

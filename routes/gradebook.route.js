@@ -36,7 +36,18 @@ router.get('/teacher/:teacherId', authenticateToken, async (req, res) => {
             .populate('terms.studentEvaluations.student', 'name') // Nome do aluno dentro das avaliações
             .sort({ 'classroom.grade': 1, 'classroom.name': 1 });
 
-        res.status(200).json(gradebooks);
+        // Ordenar as lessons dentro de cada term do gradebook
+        const sortedGradebooks = gradebooks.map(gradebook => {
+            gradebook.terms.forEach(term => {
+                if (term.lessons && Array.isArray(term.lessons)) {
+                    // Ordena por data (ou outro campo, como 'index' se tiver)
+                    term.lessons.sort((a, b) => new Date(a.date) - new Date(b.date));
+                }
+            });
+            return gradebook;
+        });
+
+        res.status(200).json(sortedGradebooks);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -53,7 +64,18 @@ router.get('/school/:schoolId', authenticateToken, async (req, res) => {
             .populate('terms.studentEvaluations.student', 'name') // Nome do aluno dentro das avaliações
             .sort({ 'classroom.grade': 1, 'classroom.name': 1 });
 
-        res.status(200).json(gradebooks);
+        // Ordenar as lessons dentro de cada term do gradebook
+        const sortedGradebooks = gradebooks.map(gradebook => {
+            gradebook.terms.forEach(term => {
+                if (term.lessons && Array.isArray(term.lessons)) {
+                    // Ordena por data (ou outro campo, como 'index' se tiver)
+                    term.lessons.sort((a, b) => new Date(a.date) - new Date(b.date));
+                }
+            });
+            return gradebook;
+        });
+
+        res.status(200).json(sortedGradebooks);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -315,7 +337,16 @@ router.delete('/:gradebookId/term/:termId/lesson/:lessonId', authenticateToken, 
 
         await gradebook.save();
 
-        res.status(200).json({ message: 'Lesson deleted successfully.', gradebook });
+        // Recarrega o gradebook com os populates
+        const updatedGradebook = await Gradebook.findById(req.params.gradebookId)
+            .populate('teacher', 'name')
+            .populate('subject', 'name')
+            .populate('classroom', 'classroomType grade name shift')
+            .populate('school', '_id');
+
+        sortLessonsInGradebook(updatedGradebook);
+
+        res.status(200).json({ message: 'Lesson deleted successfully.', gradebook: updatedGradebook });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
