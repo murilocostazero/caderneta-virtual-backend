@@ -13,6 +13,14 @@ function authenticateToken(req, res, next) {
     });
 }
 
+function sortLessonsInGradebook(gradebook) {
+    gradebook.terms.forEach(term => {
+        term.lessons.sort((a, b) => new Date(a.date) - new Date(b.date));
+    });
+    return gradebook;
+}
+
 module.exports = {
     authenticateToken,
+    sortLessonsInGradebook
 }

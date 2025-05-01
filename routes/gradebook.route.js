@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Gradebook = require('../models/gradebook.model');
 const Student = require('../models/student.model');
-const { authenticateToken } = require('../utilities');
+const { authenticateToken, sortLessonsInGradebook } = require('../utilities');
 
 // 1. Rota que busca um gradebook por ID
 router.get('/:id', authenticateToken, async (req, res) => {
@@ -16,6 +16,8 @@ router.get('/:id', authenticateToken, async (req, res) => {
         if (!gradebook) {
             return res.status(404).json({ message: "Gradebook not found" });
         }
+
+        sortLessonsInGradebook(gradebook);
 
         res.status(200).json(gradebook);
     } catch (err) {
@@ -226,7 +228,16 @@ router.post('/:gradebookId/term/:termId/lesson', authenticateToken, async (req, 
         term.lessons.push({ topic, date });
         await gradebook.save();
 
-        res.status(201).json({ message: 'Aula adicionada com sucesso', gradebook }); //Retorno o gradebook pra atualizar o componente
+        // Recarrega o gradebook com os populates
+        const updatedGradebook = await Gradebook.findById(req.params.gradebookId)
+            .populate('teacher', 'name')
+            .populate('subject', 'name')
+            .populate('classroom', 'classroomType grade name shift')
+            .populate('school', '_id');
+
+        sortLessonsInGradebook(updatedGradebook);
+
+        res.status(201).json({ message: 'Aula adicionada com sucesso', gradebook: updatedGradebook }); //Retorno o gradebook pra atualizar o componente
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -264,7 +275,17 @@ router.put('/:gradebookId/term/:termId/lesson/:lessonId', authenticateToken, asy
         term.lessons = term.lessons.sort((a, b) => new Date(a.date) - new Date(b.date));
 
         await gradebook.save();
-        res.status(200).json({ message: 'Lesson updated successfully.', gradebook });
+
+        // Recarrega o gradebook com os populates
+        const updatedGradebook = await Gradebook.findById(req.params.gradebookId)
+            .populate('teacher', 'name')
+            .populate('subject', 'name')
+            .populate('classroom', 'classroomType grade name shift')
+            .populate('school', '_id');
+
+        sortLessonsInGradebook(updatedGradebook);
+
+        res.status(200).json({ message: 'Lesson updated successfully.', gradebook: updatedGradebook });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }

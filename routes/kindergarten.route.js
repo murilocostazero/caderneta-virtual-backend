@@ -3,7 +3,7 @@ const router = express.Router();
 const Kindergarten = require('../models/kindergarten.model');
 const Student = require('../models/student.model');
 const ExperienceField = require('../models/experienceField.model');
-const { authenticateToken } = require('../utilities');
+const { authenticateToken, sortLessonsInGradebook } = require('../utilities');
 
 // 1. Rota que busca um kindergarten por ID
 router.get('/:id', authenticateToken, async (req, res) => {
@@ -16,6 +16,8 @@ router.get('/:id', authenticateToken, async (req, res) => {
         if (!kindergarten) {
             return res.status(404).json({ message: "Kindergarten not found" });
         }
+
+        sortLessonsInGradebook(kindergarten);
 
         res.status(200).json(kindergarten);
     } catch (err) {
@@ -217,7 +219,15 @@ router.post('/:kindergartenId/term/:termId/lesson', authenticateToken, async (re
         term.lessons.push({ topic, date });
         await kindergarten.save();
 
-        res.status(201).json({ message: 'Aula adicionada com sucesso', kindergarten }); //Retorno o kindergarten pra atualizar o componente
+        // Recarrega o gradebook com os populates
+        const updatedGradebook = await Kindergarten.findById(req.params.kindergartenId)
+            .populate('teacher', 'name')
+            .populate('classroom', 'classroomType grade name shift')
+            .populate('school', '_id');
+
+        sortLessonsInGradebook(updatedGradebook);
+
+        res.status(201).json({ message: 'Aula adicionada com sucesso', kindergarten: updatedGradebook }); //Retorno o kindergarten pra atualizar o componente
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -254,7 +264,16 @@ router.put('/:kindergartenId/term/:termId/lesson/:lessonId', authenticateToken, 
         term.lessons = term.lessons.sort((a, b) => new Date(a.date) - new Date(b.date));
 
         await kindergarten.save();
-        res.status(200).json({ message: 'Lesson updated successfully.', kindergarten });
+
+        // Recarrega o gradebook com os populates
+        const updatedGradebook = await Kindergarten.findById(req.params.kindergartenId)
+            .populate('teacher', 'name')
+            .populate('classroom', 'classroomType grade name shift')
+            .populate('school', '_id');
+
+        sortLessonsInGradebook(updatedGradebook);
+
+        res.status(200).json({ message: 'Lesson updated successfully.', kindergarten: updatedGradebook });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -458,8 +477,8 @@ router.get('/:kindergartenId/term/:termId/evaluations', authenticateToken, async
                         name: student.name,
                         cpf: student.cpf
                     },
-                    evaluations: studentEval 
-                        ? studentEval.evaluations 
+                    evaluations: studentEval
+                        ? studentEval.evaluations
                         : experienceFields.map(field => ({
                             fieldName: field.name,
                             evaluationCriteria: "not-yet"
