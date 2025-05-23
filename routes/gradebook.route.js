@@ -732,4 +732,122 @@ router.delete('/:id', authenticateToken, async (req, res) => {
     }
 });
 
+// VISTO DO COORDENADOR
+router.put('/:gradebookId/terms/:termId/approve', authenticateToken, async (req, res) => {
+    try {
+        const { gradebookId, termId } = req.params;
+        const { comments } = req.body;
+        
+        const gradebook = await Gradebook.findById(gradebookId)
+            .populate('teacher', 'name')
+            .populate('subject', 'name')
+            .populate('classroom', 'classroomType grade name shift')
+            .populate('school', '_id');
+
+        if (!gradebook) {
+            return res.status(404).json({ message: "Gradebook not found" });
+        }
+
+        const term = gradebook.terms.id(termId);
+        if (!term) {
+            return res.status(404).json({ message: "Term not found in this gradebook" });
+        }
+
+        // Atualiza a aprovação
+        term.coordinatorApproval = {
+            approved: true,
+            approvedBy: req.user._id,
+            approvedAt: new Date(),
+            comments: comments || ''
+        };
+
+        await gradebook.save();
+
+        // Ordena as lessons após a atualização
+        sortLessonsInGradebook(gradebook);
+
+        res.status(200).json({
+            message: "Term approved successfully by coordinator",
+            gradebook: gradebook
+        });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+router.put('/:gradebookId/terms/:termId/disapprove', authenticateToken, async (req, res) => {
+    try {
+        const { gradebookId, termId } = req.params;
+        
+        const gradebook = await Gradebook.findById(gradebookId)
+            .populate('teacher', 'name')
+            .populate('subject', 'name')
+            .populate('classroom', 'classroomType grade name shift')
+            .populate('school', '_id');
+
+        if (!gradebook) {
+            return res.status(404).json({ message: "Gradebook not found" });
+        }
+
+        const term = gradebook.terms.id(termId);
+        if (!term) {
+            return res.status(404).json({ message: "Term not found in this gradebook" });
+        }
+
+        // Remove a aprovação
+        term.coordinatorApproval = {
+            approved: false,
+            approvedBy: null,
+            approvedAt: null,
+            comments: ''
+        };
+
+        await gradebook.save();
+
+        // Ordena as lessons após a atualização
+        sortLessonsInGradebook(gradebook);
+
+        res.status(200).json({
+            message: "Term approval removed successfully",
+            gradebook: gradebook
+        });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+router.get('/:gradebookId/terms/:termId/approval-status', authenticateToken, async (req, res) => {
+    try {
+        const { gradebookId, termId } = req.params;
+        
+        const gradebook = await Gradebook.findById(gradebookId)
+            .populate('teacher', 'name')
+            .populate('subject', 'name')
+            .populate('classroom', 'classroomType grade name shift')
+            .populate('school', '_id')
+            .populate('terms.coordinatorApproval.approvedBy', 'name email');
+
+        if (!gradebook) {
+            return res.status(404).json({ message: "Gradebook not found" });
+        }
+
+        const term = gradebook.terms.id(termId);
+        if (!term) {
+            return res.status(404).json({ message: "Term not found in this gradebook" });
+        }
+
+        res.status(200).json({
+            approvalStatus: term.coordinatorApproval,
+            termName: term.name,
+            gradebookInfo: {
+                subject: gradebook.subject,
+                classroom: gradebook.classroom,
+                teacher: gradebook.teacher
+            }
+        });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
 module.exports = router;

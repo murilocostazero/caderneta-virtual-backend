@@ -9,11 +9,11 @@ const AttendanceSchema = new mongoose.Schema({
 const LessonSchema = new Schema({
     topic: String,
     date: Date,
-    workload: { 
-        type: Number, 
+    workload: {
+        type: Number,
         required: false,
         min: 1
-    }, 
+    },
     attendance: [AttendanceSchema]
 });
 
@@ -28,12 +28,20 @@ const StudentEvaluationSchema = new Schema({
     totalAbsences: Number
 });
 
+const CoordinatorApprovalSchema = new Schema({
+    approved: { type: Boolean, default: false },
+    approvedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    approvedAt: { type: Date },
+    comments: { type: String }
+});
+
 const TermSchema = new Schema({
-    name: {type: String},
+    name: { type: String },
     startDate: { type: Date, required: true }, // Data de início
     endDate: { type: Date, required: true }, // Data de término
     lessons: [LessonSchema],
-    studentEvaluations: [StudentEvaluationSchema]
+    studentEvaluations: [StudentEvaluationSchema],
+    coordinatorApproval: CoordinatorApprovalSchema
 });
 
 const GradebookSchema = new Schema({
