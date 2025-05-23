@@ -226,16 +226,16 @@ router.delete('/:gradebookId/term/:termId', authenticateToken, async (req, res) 
 
 // 8. Rota para adicionar uma nova Lesson
 router.post('/:gradebookId/term/:termId/lesson', authenticateToken, async (req, res) => {
-    const { topic, date } = req.body;
-    if (!topic || !date) {
-        return res.status(400).json({ message: 'Assunto e data são obrigatórios' });
+    const { topic, date, workload } = req.body;
+    if (!topic || !date || !workload) {
+        return res.status(400).json({ message: 'Assunto, data e carga horária são obrigatórios' });
     }
 
     try {
         const gradebook = await Gradebook.findById(req.params.gradebookId)
-            .populate('teacher', 'name') // Preenche o campo 'professor' com o nome do professor
-            .populate('subject', 'name')   // Preenche o campo 'subject' com o nome da matéria
-            .populate('classroom', 'classroomType grade name shift') // Preenche o campo 'classroom' com o nome da turma
+            .populate('teacher', 'name')
+            .populate('subject', 'name')
+            .populate('classroom', 'classroomType grade name shift')
             .populate('school', '_id');
 
         if (!gradebook) {
@@ -247,10 +247,9 @@ router.post('/:gradebookId/term/:termId/lesson', authenticateToken, async (req, 
             return res.status(404).json({ message: 'Bimestre não encontrado' });
         }
 
-        term.lessons.push({ topic, date });
+        term.lessons.push({ topic, date, workload: Number(workload) });
         await gradebook.save();
 
-        // Recarrega o gradebook com os populates
         const updatedGradebook = await Gradebook.findById(req.params.gradebookId)
             .populate('teacher', 'name')
             .populate('subject', 'name')
@@ -259,7 +258,7 @@ router.post('/:gradebookId/term/:termId/lesson', authenticateToken, async (req, 
 
         sortLessonsInGradebook(updatedGradebook);
 
-        res.status(201).json({ message: 'Aula adicionada com sucesso', gradebook: updatedGradebook }); //Retorno o gradebook pra atualizar o componente
+        res.status(201).json({ message: 'Aula adicionada com sucesso', gradebook: updatedGradebook });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -267,38 +266,36 @@ router.post('/:gradebookId/term/:termId/lesson', authenticateToken, async (req, 
 
 // 9. Rota para editar uma Lesson
 router.put('/:gradebookId/term/:termId/lesson/:lessonId', authenticateToken, async (req, res) => {
-    const { topic, date } = req.body;
-
+    const { topic, date, workload } = req.body;
     try {
         const gradebook = await Gradebook.findById(req.params.gradebookId)
-            .populate('teacher', 'name') // Preenche o campo 'professor' com o nome do professor
-            .populate('subject', 'name')   // Preenche o campo 'subject' com o nome da matéria
-            .populate('classroom', 'classroomType grade name shift') // Preenche o campo 'classroom' com o nome da turma
+            .populate('teacher', 'name')
+            .populate('subject', 'name')
+            .populate('classroom', 'classroomType grade name shift')
             .populate('school', '_id');
 
         if (!gradebook) {
-            return res.status(404).json({ message: 'Gradebook not found.' });
+            return res.status(404).json({ message: 'Caderneta não encontrada' });
         }
 
         const term = gradebook.terms.id(req.params.termId);
         if (!term) {
-            return res.status(404).json({ message: 'Term not found.' });
+            return res.status(404).json({ message: 'Bimestre não encontrado' });
         }
 
         const lesson = term.lessons.id(req.params.lessonId);
         if (!lesson) {
-            return res.status(404).json({ message: 'Lesson not found.' });
+            return res.status(404).json({ message: 'Aula não encontrada' });
         }
 
         if (topic) lesson.topic = topic;
         if (date) lesson.date = date;
+        if (workload !== undefined) lesson.workload = Number(workload);
 
-        // Ordenar as aulas por data após atualizar a lesson
         term.lessons = term.lessons.sort((a, b) => new Date(a.date) - new Date(b.date));
 
         await gradebook.save();
 
-        // Recarrega o gradebook com os populates
         const updatedGradebook = await Gradebook.findById(req.params.gradebookId)
             .populate('teacher', 'name')
             .populate('subject', 'name')
@@ -307,7 +304,7 @@ router.put('/:gradebookId/term/:termId/lesson/:lessonId', authenticateToken, asy
 
         sortLessonsInGradebook(updatedGradebook);
 
-        res.status(200).json({ message: 'Lesson updated successfully.', gradebook: updatedGradebook });
+        res.status(200).json({ message: 'Aula atualizada com sucesso.', gradebook: updatedGradebook });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }

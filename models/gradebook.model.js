@@ -9,6 +9,11 @@ const AttendanceSchema = new mongoose.Schema({
 const LessonSchema = new Schema({
     topic: String,
     date: Date,
+    workload: { 
+        type: Number, 
+        required: false,
+        min: 1
+    }, 
     attendance: [AttendanceSchema]
 });
 
