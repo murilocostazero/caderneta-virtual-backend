@@ -235,7 +235,11 @@ router.post('/:gradebookId/term/:termId/lesson', authenticateToken, async (req, 
         const gradebook = await Gradebook.findById(req.params.gradebookId)
             .populate('teacher', 'name')
             .populate('subject', 'name')
-            .populate('classroom', 'classroomType grade name shift')
+            .populate({
+                path: 'classroom',
+                select: 'classroomType grade name shift students', // pegar alunos também
+                populate: { path: 'students', select: '_id' } // garante que pega ids dos alunos
+            })
             .populate('school', '_id');
 
         if (!gradebook) {
@@ -247,18 +251,30 @@ router.post('/:gradebookId/term/:termId/lesson', authenticateToken, async (req, 
             return res.status(404).json({ message: 'Bimestre não encontrado' });
         }
 
-        term.lessons.push({ topic, date, workload: Number(workload) });
+        // Cria a nova aula
+        const newLesson = {
+            topic,
+            date,
+            workload: Number(workload),
+        };
+
+        term.lessons.push(newLesson);
+        const lesson = term.lessons[term.lessons.length - 1]; // pega a última inserida
+
+        // Criar chamada automática com todos presentes
+        if (gradebook.classroom.students && gradebook.classroom.students.length > 0) {
+            lesson.attendance = gradebook.classroom.students.map(student => ({
+                studentId: student._id,
+                present: true
+            }));
+        }
+
         await gradebook.save();
 
-        const updatedGradebook = await Gradebook.findById(req.params.gradebookId)
-            .populate('teacher', 'name')
-            .populate('subject', 'name')
-            .populate('classroom', 'classroomType grade name shift')
-            .populate('school', '_id');
-
-        sortLessonsInGradebook(updatedGradebook);
-
-        res.status(201).json({ message: 'Aula adicionada com sucesso', gradebook: updatedGradebook });
+        res.status(201).json({
+            message: 'Aula e chamada criadas com sucesso',
+            gradebook
+        });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -310,7 +326,7 @@ router.put('/:gradebookId/term/:termId/lesson/:lessonId', authenticateToken, asy
     }
 });
 
-// Rota para excluir uma Lesson
+// 10. Rota para excluir uma Lesson
 router.delete('/:gradebookId/term/:termId/lesson/:lessonId', authenticateToken, async (req, res) => {
     try {
         const gradebook = await Gradebook.findById(req.params.gradebookId)
@@ -349,7 +365,7 @@ router.delete('/:gradebookId/term/:termId/lesson/:lessonId', authenticateToken, 
     }
 });
 
-//Rota para criar uma chamada
+// 11. Rota para criar uma chamada
 router.post('/:gradebookId/term/:termId/lesson/:lessonId/attendance', authenticateToken, async (req, res) => {
     const { attendance } = req.body; // Array de { studentId, present }
 
