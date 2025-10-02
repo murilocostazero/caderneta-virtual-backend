@@ -28,20 +28,13 @@ const StudentEvaluationSchema = new Schema({
     totalAbsences: Number
 });
 
-const CoordinatorApprovalSchema = new Schema({
-    approved: { type: Boolean, default: false },
-    approvedBy: { type: Schema.Types.ObjectId, ref: 'User' },
-    approvedAt: { type: Date },
-    comments: { type: String }
-});
-
 const TermSchema = new Schema({
     name: { type: String },
     startDate: { type: Date, required: true }, // Data de início
     endDate: { type: Date, required: true }, // Data de término
     lessons: [LessonSchema],
     studentEvaluations: [StudentEvaluationSchema],
-    coordinatorApproval: CoordinatorApprovalSchema
+    approved: { type: Boolean, default: false } 
 });
 
 const GradebookSchema = new Schema({
