@@ -99,12 +99,12 @@ router.post('/', authenticateToken, async (req, res) => {
 
 // 5. Rota que altera os dados do kindergarten
 router.put('/:id', authenticateToken, async (req, res) => {
-    const { academicYear, school, classroom, teacher } = req.body;
+    const { academicYear,  skill, school, classroom, teacher } = req.body;
 
     try {
         const updatedKindergarten = await Kindergarten.findByIdAndUpdate(
             req.params.id,
-            { academicYear, school, classroom, teacher },
+            { academicYear, skill, school, classroom, teacher },
             { new: true }
         );
         if (!updatedKindergarten) {

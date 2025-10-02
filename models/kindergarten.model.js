@@ -47,6 +47,7 @@ const TermSchema = new Schema({
 // Esquema do Diário Infantil (Kindergarten)
 const KindergartenGradebookSchema = new Schema({
     academicYear: Number,
+    skill: String,
     classroom: { type: Schema.Types.ObjectId, ref: 'Classroom', required: true },
     teacher: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     school: { type: Schema.Types.ObjectId, ref: 'School', required: true },
