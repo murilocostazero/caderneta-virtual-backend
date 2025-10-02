@@ -533,7 +533,12 @@ router.put('/:kindergartenId/term/:termId/evaluations', authenticateToken, async
         const { evaluations } = req.body; // Array de avaliações
 
         // Buscar o diário escolar
-        const gradebook = await Kindergarten.findById(kindergartenId);
+        const gradebook = await Kindergarten.findById(kindergartenId)
+            .populate('teacher', 'name') // Popula o campo 'teacher' com o nome do professor
+            .populate('classroom', 'classroomType grade name shift') // Popula 'classroom'
+            .populate('school', '_id')  // Popula 'school' com o ID da escola
+            .sort({ 'classroom.grade': 1, 'classroom.name': 1 });
+
         if (!gradebook) {
             return res.status(404).json({ message: "Diário não encontrado" });
         }
@@ -587,7 +592,7 @@ router.put('/:kindergartenId/term/:termId/evaluations', authenticateToken, async
 
         const updatedEvaluations = gradebook.terms.id(termId).studentEvaluations;
 
-        res.status(200).json({ message: 'Avaliações atualizadas com sucesso.', evaluations: updatedEvaluations });
+        res.status(200).json({ message: 'Avaliações atualizadas com sucesso.', evaluations: updatedEvaluations, gradebook: gradebook });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Erro ao atualizar avaliações.', error: error.message });
