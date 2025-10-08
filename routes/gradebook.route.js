@@ -56,30 +56,43 @@ router.get('/teacher/:teacherId', authenticateToken, async (req, res) => {
 // 3. Rota que busca todos os gradebooks de uma escola
 router.get('/school/:schoolId', authenticateToken, async (req, res) => {
     try {
-        const gradebooks = await Gradebook.find({ school: req.params.schoolId })
-            .populate('teacher', 'name') // Preenche o campo 'professor' com o nome do professor
-            .populate('subject', 'name')   // Preenche o campo 'subject' com o nome da matéria
-            .populate('classroom', 'classroomType grade name shift') // Preenche o campo 'classroom' com o nome da turma
-            .populate('school', '_id')  // Opcional, preenche o campo 'school' com o ID da escola (se necessário)
-            .populate('terms.studentEvaluations.student', 'name') // Nome do aluno dentro das avaliações
-            .sort({ 'classroom.grade': 1, 'classroom.name': 1 });
+        const skip = parseInt(req.query.skip) || 0;
+        const limit = parseInt(req.query.limit) || 10;
 
-        // Ordenar as lessons dentro de cada term do gradebook
+        // Primeiro busca os _ids paginados
+        const gradebookIds = await Gradebook.find({ school: req.params.schoolId })
+            .select('_id')
+            .skip(skip)
+            .limit(limit);
+
+        const ids = gradebookIds.map(gb => gb._id);
+
+        // Agora busca os registros completos usando os IDs
+        const gradebooks = await Gradebook.find({ _id: { $in: ids } })
+            .populate('teacher', 'name')
+            .populate('subject', 'name')
+            .populate('classroom', 'classroomType grade name shift')
+            .populate('school', '_id')
+            .populate('terms.studentEvaluations.student', 'name');
+
+        // Ordenar lessons dentro de cada term
         const sortedGradebooks = gradebooks.map(gradebook => {
             gradebook.terms.forEach(term => {
                 if (term.lessons && Array.isArray(term.lessons)) {
-                    // Ordena por data (ou outro campo, como 'index' se tiver)
                     term.lessons.sort((a, b) => new Date(a.date) - new Date(b.date));
                 }
             });
             return gradebook;
         });
 
-        res.status(200).json(sortedGradebooks);
+        const total = await Gradebook.countDocuments({ school: req.params.schoolId });
+
+        res.status(200).json({ total, skip, limit, data: sortedGradebooks });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
 });
+
 
 // 4. Rota que adiciona um novo gradebook
 router.post('/', authenticateToken, async (req, res) => {
@@ -752,7 +765,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
 router.put('/:gradebookId/terms/:termId/approve', authenticateToken, async (req, res) => {
     try {
         const { gradebookId, termId } = req.params;
-        
+
         const gradebook = await Gradebook.findById(gradebookId)
             .populate('teacher', 'name')
             .populate('subject', 'name')

@@ -54,25 +54,36 @@ router.get('/teacher/:teacherId', authenticateToken, async (req, res) => {
 // 3. Rota que busca todos os kindergartens de uma escola
 router.get('/school/:schoolId', authenticateToken, async (req, res) => {
     try {
-        const kindergartens = await Kindergarten.find({ school: req.params.schoolId })
-            .populate('teacher', 'name') // Preenche o campo 'professor' com o nome do professor
-            .populate('classroom', 'classroomType grade name shift') // Preenche o campo 'classroom' com o nome da turma
-            .populate('school', '_id')  // Opcional, preenche o campo 'school' com o ID da escola (se necessário)
-            .populate('terms.studentEvaluations.student.name', 'name') // Nome do aluno dentro das avaliações
-            .sort({ 'classroom.grade': 1, 'classroom.name': 1 });
+        const skip = parseInt(req.query.skip) || 0;
+        const limit = parseInt(req.query.limit) || 10;
 
-        // Ordenar as lessons dentro de cada term do gradebook
-        const sortedGradebooks = kindergartens.map(gradebook => {
+        // Busca os _ids paginados
+        const kgIds = await Kindergarten.find({ school: req.params.schoolId })
+            .select('_id')
+            .skip(skip)
+            .limit(limit);
+
+        const ids = kgIds.map(kg => kg._id);
+
+        // Busca os registros completos sem tentar popular student
+        const kindergartens = await Kindergarten.find({ _id: { $in: ids } })
+            .populate('teacher', 'name')
+            .populate('classroom', 'classroomType grade name shift')
+            .populate('school', '_id');
+
+        // Ordenar lessons dentro de cada term
+        const sortedKindergartens = kindergartens.map(gradebook => {
             gradebook.terms.forEach(term => {
                 if (term.lessons && Array.isArray(term.lessons)) {
-                    // Ordena por data (ou outro campo, como 'index' se tiver)
                     term.lessons.sort((a, b) => new Date(a.date) - new Date(b.date));
                 }
             });
             return gradebook;
         });
 
-        res.status(200).json(sortedGradebooks);
+        const total = await Kindergarten.countDocuments({ school: req.params.schoolId });
+
+        res.status(200).json({ total, skip, limit, data: sortedKindergartens });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -99,7 +110,7 @@ router.post('/', authenticateToken, async (req, res) => {
 
 // 5. Rota que altera os dados do kindergarten
 router.put('/:id', authenticateToken, async (req, res) => {
-    const { academicYear,  skill, school, classroom, teacher } = req.body;
+    const { academicYear, skill, school, classroom, teacher } = req.body;
 
     try {
         const updatedKindergarten = await Kindergarten.findByIdAndUpdate(
