@@ -8,8 +8,19 @@ const SchoolSubjectSchema = new Schema({
         trim: true
     },
     workload: {
-        type: Number, // Carga horária em horas
-        required: true
+        // Mantém o campo atual para compatibilidade
+        type: Number,
+        required: false // Torna opcional durante a transição
+    },
+    workloads: {
+        elementary: {
+            type: Number,
+            required: true // Carga horária para Fundamental
+        },
+        highSchool: {
+            type: Number,
+            required: true // Carga horária para Médio
+        }
     },
     school: {
         type: Schema.Types.ObjectId,

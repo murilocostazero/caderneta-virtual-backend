@@ -4,6 +4,7 @@ const SchoolSubject = require('../models/schoolSubject.model');
 const User = require('../models/user.model'); // Para manipular associações com professores
 const { authenticateToken } = require('../utilities');
 
+// Rota para buscar uma disciplina específica
 router.get('/:id', authenticateToken, async (req, res) => {
     try {
         const subject = await SchoolSubject.findById(req.params.id).populate('teachers');
@@ -14,12 +15,12 @@ router.get('/:id', authenticateToken, async (req, res) => {
     }
 });
 
-//Rota para buscar todas as disciplinas da escola
+// Rota para buscar todas as disciplinas da escola
 router.get('/school/:schoolId', authenticateToken, async (req, res) => {
     try {
         const subjects = await SchoolSubject.find({ school: req.params.schoolId })
-        .populate('teachers')        
-        .sort({ 'name': 1 });
+            .populate('teachers')        
+            .sort({ 'name': 1 });
         
         res.status(200).json(subjects);
     } catch (error) {
@@ -27,10 +28,24 @@ router.get('/school/:schoolId', authenticateToken, async (req, res) => {
     }
 });
 
+// Rota para criar uma nova disciplina
 router.post('/', authenticateToken, async (req, res) => {
     try {
-        const { name, workload, schoolId } = req.body;
-        const newSubject = new SchoolSubject({ name, workload, school: schoolId });
+        const { name, workloads, schoolId } = req.body;
+        
+        // Validação das cargas horárias
+        if (!workloads || !workloads.elementary || !workloads.highSchool) {
+            return res.status(400).json({ 
+                message: 'Cargas horárias para ensino fundamental e médio são obrigatórias.' 
+            });
+        }
+
+        const newSubject = new SchoolSubject({ 
+            name, 
+            workloads,
+            school: schoolId 
+        });
+        
         await newSubject.save();
         res.status(201).json({ message: 'Disciplina criada com sucesso.', subject: newSubject });
     } catch (error) {
@@ -38,15 +53,29 @@ router.post('/', authenticateToken, async (req, res) => {
     }
 });
 
+// Rota para atualizar uma disciplina
 router.put('/:id', authenticateToken, async (req, res) => {
-    console.log(req.body)
+    console.log(req.body);
     try {
-        const { name, workload } = req.body;
+        const { name, workloads } = req.body;
+        
+        // Validação se workloads foi fornecido
+        if (workloads && (!workloads.elementary || !workloads.highSchool)) {
+            return res.status(400).json({ 
+                message: 'Ambas as cargas horárias (ensino fundamental e médio) são obrigatórias.' 
+            });
+        }
+
+        const updateData = {};
+        if (name) updateData.name = name;
+        if (workloads) updateData.workloads = workloads;
+
         const subject = await SchoolSubject.findByIdAndUpdate(
             req.params.id,
-            { name, workload },
+            updateData,
             { new: true }
         );
+        
         if (!subject) return res.status(404).json({ message: 'Disciplina não encontrada.' });
         res.status(200).json({ message: 'Disciplina atualizada com sucesso.', subject });
     } catch (error) {
@@ -54,6 +83,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
     }
 });
 
+// Rota para deletar uma disciplina
 router.delete('/:id', authenticateToken, async (req, res) => {
     try {
         const subject = await SchoolSubject.findByIdAndDelete(req.params.id);
@@ -64,7 +94,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
     }
 });
 
-//Rota para associar um professor a uma disciplina
+// Rota para associar um professor a uma disciplina
 router.put('/:subjectId/add-teacher/:teacherId', authenticateToken, async (req, res) => {
     try {
         const subject = await SchoolSubject.findById(req.params.subjectId);
@@ -92,7 +122,7 @@ router.put('/:subjectId/add-teacher/:teacherId', authenticateToken, async (req, 
     }
 });
 
-//Rota para desassociar o professor da disciplina
+// Rota para desassociar o professor da disciplina
 router.put('/:subjectId/remove-teacher/:teacherId', authenticateToken, async (req, res) => {
     try {
         const subject = await SchoolSubject.findById(req.params.subjectId);
