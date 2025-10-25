@@ -17,7 +17,29 @@ const app = express();
 
 // Middlewares
 app.use(express.json());
-app.use(cors({ origin: '*' }));
+//app.use(cors({ origin: '*' }));
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Content-Length', 'Authorization'],
+  credentials: false,
+}));
+
+//middleware manual para garantir que os cabeçalhos sejam aplicados mesmo em respostas de erro
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header(
+    'Access-Control-Allow-Headers',
+    'Origin, X-Requested-With, Content-Type, Accept, Authorization'
+  );
+  if (req.method === 'OPTIONS') {
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE');
+    return res.status(200).json({});
+  }
+  next();
+});
+
 
 // Importar as rotas
 const userRoute = require('./routes/user.route');
