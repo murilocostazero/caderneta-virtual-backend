@@ -94,37 +94,37 @@ router.get('/school/:schoolId', authenticateToken, async (req, res) => {
 });
 
 router.get('/school-allgb/:schoolId', authenticateToken, async (req, res) => {
-  try {
-    // Busca direta: sem a etapa de pegar só os IDs antes
-    const gradebooks = await Gradebook.find({ school: req.params.schoolId })
-      .populate('teacher', 'name')
-      .populate('subject', 'name')
-      .populate('classroom', 'classroomType grade name shift')
-      .populate('school', '_id')
-      .populate('terms.studentEvaluations.student', 'name')
-      .lean(); // ⚡ retorna objetos JS puros (muito mais rápido e leve)
+    try {
+        // Busca direta: sem a etapa de pegar só os IDs antes
+        const gradebooks = await Gradebook.find({ school: req.params.schoolId })
+            .populate('teacher', 'name')
+            .populate('subject', 'name')
+            .populate('classroom', 'classroomType grade name shift')
+            .populate('school', '_id')
+            .populate('terms.studentEvaluations.student', 'name')
+            .lean(); // ⚡ retorna objetos JS puros (muito mais rápido e leve)
 
-    // Ordena as aulas (lessons) dentro de cada term
-    for (const gb of gradebooks) {
-      if (gb.terms && Array.isArray(gb.terms)) {
-        gb.terms.forEach(term => {
-          if (term.lessons && Array.isArray(term.lessons)) {
-            term.lessons.sort((a, b) => new Date(a.date) - new Date(b.date));
-          }
-        });
-      }
+        // Ordena as aulas (lessons) dentro de cada term
+        for (const gb of gradebooks) {
+            if (gb.terms && Array.isArray(gb.terms)) {
+                gb.terms.forEach(term => {
+                    if (term.lessons && Array.isArray(term.lessons)) {
+                        term.lessons.sort((a, b) => new Date(a.date) - new Date(b.date));
+                    }
+                });
+            }
+        }
+
+        // Calcula o total de cadernetas
+        const total = gradebooks.length;
+
+        // Retorna no mesmo formato da sua versão antiga
+        res.status(200).json({ total, data: gradebooks });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: err.message });
     }
-
-    // Calcula o total de cadernetas
-    const total = gradebooks.length;
-
-    // Retorna no mesmo formato da sua versão antiga
-    res.status(200).json({ total, data: gradebooks });
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: err.message });
-  }
 });
 
 // 4. Rota que adiciona um novo gradebook
@@ -741,7 +741,7 @@ router.get('/:gradebookId/learning-record', authenticateToken, async (req, res) 
             const totalAbsences = gradebook.terms.reduce((absenceSum, term) => {
                 const lessons = term.lessons || [];
                 const absencesInTerm = lessons.reduce((lessonAbsences, lesson) => {
-                    const attendanceRecord = lesson.attendance.find(
+                    const attendanceRecord = (lesson.attendance || []).find(
                         (att) => att.studentId.toString() === student._id.toString()
                     );
                     return lessonAbsences + (attendanceRecord && !attendanceRecord.present ? 1 : 0);
@@ -749,10 +749,9 @@ router.get('/:gradebookId/learning-record', authenticateToken, async (req, res) 
                 return absenceSum + absencesInTerm;
             }, 0);
 
-            // Médias bimestrais
             const bimonthlyAverages = gradebook.terms.map((term) => {
-                const evaluation = term.studentEvaluations.find(
-                    (ev) => ev.student._id.toString() === student._id.toString()
+                const evaluation = (term.studentEvaluations || []).find(
+                    (ev) => ev.student && ev.student._id.toString() === student._id.toString()
                 );
                 return {
                     term: term.name,
