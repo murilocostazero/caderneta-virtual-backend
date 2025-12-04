@@ -704,12 +704,11 @@ router.put('/:gradebookId/term/:termId/evaluations', authenticateToken, async (r
     }
 });
 
-// GET: Rota que busca o Registro geral de atividade
+//REGISTRO GERAL
 router.get('/:gradebookId/learning-record', authenticateToken, async (req, res) => {
     try {
         const { gradebookId } = req.params;
 
-        // Encontrar o gradebook e fazer o populate nos campos necessários
         const gradebook = await Gradebook.findById(gradebookId)
             .populate({
                 path: 'classroom',
@@ -717,7 +716,7 @@ router.get('/:gradebookId/learning-record', authenticateToken, async (req, res) 
                     path: 'students',
                     model: 'Student',
                     select: 'name cpf',
-                    options: { sort: { name: 1 } } //Ordena os alunos por nome
+                    options: { sort: { name: 1 } }
                 },
             })
             .populate('subject', 'name')
@@ -735,9 +734,10 @@ router.get('/:gradebookId/learning-record', authenticateToken, async (req, res) 
             return res.status(404).json({ message: 'No students found for this classroom' });
         }
 
-        // Calcular o registro anual
+        // Registro anual
         const learningRecord = gradebook.classroom.students.map((student) => {
-            // Total de faltas
+
+            // ---------- FALTAS ----------
             const totalAbsences = gradebook.terms.reduce((absenceSum, term) => {
                 const lessons = term.lessons || [];
                 const absencesInTerm = lessons.reduce((lessonAbsences, lesson) => {
@@ -749,6 +749,7 @@ router.get('/:gradebookId/learning-record', authenticateToken, async (req, res) 
                 return absenceSum + absencesInTerm;
             }, 0);
 
+            // ---------- MÉDIA BIMESTRAL ----------
             const bimonthlyAverages = gradebook.terms.map((term) => {
                 const evaluation = (term.studentEvaluations || []).find(
                     (ev) => ev.student && ev.student._id.toString() === student._id.toString()
@@ -759,10 +760,25 @@ router.get('/:gradebookId/learning-record', authenticateToken, async (req, res) 
                 };
             });
 
-            // Média anual
+            // ---------- MÉDIA ANUAL ----------
             const annualAverage =
                 bimonthlyAverages.reduce((sum, b) => sum + b.average, 0) /
                 (bimonthlyAverages.length || 1);
+
+            // ---------- RECUPERAÇÃO FINAL E MÉDIA FINAL ----------
+            // Achar avaliação de qualquer um dos termos (todas têm os mesmos dados do aluno)
+            const evalFull = gradebook.terms
+                .flatMap(t => t.studentEvaluations)
+                .find(ev => ev.student && ev.student._id.toString() === student._id.toString());
+
+            const finalRecovery = evalFull?.finalRecovery || null;
+
+            let finalAverage = annualAverage;
+
+            if (finalRecovery !== null && !isNaN(finalRecovery)) {
+                // regra mais comum
+                finalAverage = ((annualAverage + finalRecovery) / 2);
+            }
 
             return {
                 student: {
@@ -772,11 +788,83 @@ router.get('/:gradebookId/learning-record', authenticateToken, async (req, res) 
                 },
                 bimonthlyAverages,
                 annualAverage: parseFloat(annualAverage.toFixed(2)),
+                finalRecovery,
+                finalAverage: parseFloat(finalAverage.toFixed(2)),
                 totalAbsences,
             };
         });
 
         res.status(200).json(learningRecord);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Internal Server Error' });
+    }
+});
+
+// PUT - Salva ou altera Recuperação Final de um aluno
+router.put('/:gradebookId/final-recovery/:studentId', authenticateToken, async (req, res) => {
+    try {
+        const { gradebookId, studentId } = req.params;
+        const { finalRecovery } = req.body;
+
+        if (finalRecovery === undefined || finalRecovery === null) {
+            return res.status(400).json({ message: 'finalRecovery is required' });
+        }
+
+        // Buscar o Gradebook
+        const gradebook = await Gradebook.findById(gradebookId);
+
+        if (!gradebook) {
+            return res.status(404).json({ message: 'Gradebook not found' });
+        }
+
+        // Procurar a avaliação do aluno dentro dos termos
+        let studentEval = null;
+
+        for (const term of gradebook.terms) {
+            const evalFound = term.studentEvaluations.find(
+                ev => ev.student.toString() === studentId
+            );
+            if (evalFound) {
+                studentEval = evalFound;
+                break;
+            }
+        }
+
+        if (!studentEval) {
+            return res.status(404).json({ message: 'Student evaluation not found in this gradebook' });
+        }
+
+        // Atualiza recuperação final
+        studentEval.finalRecovery = finalRecovery;
+
+        // Recalcular média anual
+        const bimonthlyAverages = gradebook.terms.map(t => {
+            const ev = t.studentEvaluations.find(ev => ev.student.toString() === studentId);
+            return ev?.bimonthlyAverage || 0;
+        });
+
+        const annualAverage =
+            bimonthlyAverages.reduce((s, a) => s + a, 0) /
+            (bimonthlyAverages.length || 1);
+
+        // Regra da média final
+        if (finalRecovery !== null && !isNaN(finalRecovery)) {
+            studentEval.finalAverage = ((annualAverage + finalRecovery) / 2).toFixed(2);
+        } else {
+            studentEval.finalAverage = annualAverage.toFixed(2);
+        }
+
+        // Salvar gradebook completo
+        await gradebook.save();
+
+        res.status(200).json({
+            message: 'Final recovery and final average updated successfully',
+            finalRecovery: studentEval.finalRecovery,
+            finalAverage: studentEval.finalAverage,
+            gradebook: gradebook
+        });
+
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Internal Server Error' });

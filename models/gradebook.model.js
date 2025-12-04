@@ -25,7 +25,9 @@ const StudentEvaluationSchema = new Schema({
     bimonthlyGrade: Number,
     bimonthlyRecovery: Number,
     bimonthlyAverage: Number,
-    totalAbsences: Number
+    totalAbsences: Number,
+    finalRecovery: Number,  // Nota da Recuperação Final
+    finalAverage: Number    // Média Final do aluno (após R.F.)
 });
 
 const TermSchema = new Schema({
