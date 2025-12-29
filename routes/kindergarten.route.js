@@ -611,61 +611,112 @@ router.put('/:kindergartenId/term/:termId/evaluations', authenticateToken, async
 });
 
 // Rota para obter o Registro Geral
-router.get('/:kindergartenId/general-record', authenticateToken, async (req, res) => {
+router.get('/:kindergartenId/learning-record', authenticateToken, async (req, res) => {
     try {
         const { kindergartenId } = req.params;
 
-        // Buscar o diário escolar
-        const gradebook = await Kindergarten.findById(kindergartenId);
+        const gradebook = await Kindergarten.findById(kindergartenId)
+            .populate({
+                path: 'classroom',
+                populate: {
+                    path: 'students',
+                    model: 'Student',
+                    select: 'name',
+                    options: { sort: { name: 1 } }
+                }
+            });
+
         if (!gradebook) {
-            return res.status(404).json({ message: "Diário não encontrado" });
+            return res.status(404).json({ message: 'Gradebook not found' });
         }
 
-        // Mapeamento dos critérios em ordem de progressão
-        const criteriaOrder = ['not-yet', 'under-development', 'developed'];
+        if (!gradebook.classroom || !gradebook.classroom.students) {
+            return res.status(404).json({ message: 'No students found for this classroom' });
+        }
 
-        // Criar estrutura para armazenar o critério final e total de faltas de cada aluno
-        const finalEvaluations = {};
+        const learningRecord = gradebook.classroom.students.map(student => {
 
-        // Iterar sobre todos os bimestres
-        gradebook.terms.forEach(term => {
-            term.studentEvaluations.forEach(studentEval => {
-                const studentId = String(studentEval.student._id);
+            // ---------- FALTAS ANUAIS ----------
+            const totalAbsences = gradebook.terms.reduce((sum, term) => {
+                const lessons = term.lessons || [];
 
-                if (!finalEvaluations[studentId]) {
-                    finalEvaluations[studentId] = {
-                        student: studentEval.student,
-                        evaluations: {},
-                        totalAbsences: 0 // Inicializa o total de faltas
-                    };
-                }
+                const absencesInTerm = lessons.reduce((lessonSum, lesson) => {
+                    const attendance = lesson.attendance?.find(
+                        att => att.studentId.toString() === student._id.toString()
+                    );
+                    return lessonSum + (attendance && !attendance.present ? 1 : 0);
+                }, 0);
 
-                // Somar as faltas do aluno no bimestre atual
-                finalEvaluations[studentId].totalAbsences += studentEval.totalAbsences || 0;
+                return sum + absencesInTerm;
+            }, 0);
 
-                // Iterar sobre as avaliações do aluno
-                studentEval.evaluations.forEach(evaluation => {
-                    const fieldName = evaluation.fieldName;
-                    const currentCriteria = evaluation.evaluationCriteria;
+            // ---------- AVALIAÇÕES POR PERÍODO ----------
+            const termsEvaluation = gradebook.terms.map(term => {
+                const studentEval = term.studentEvaluations.find(
+                    ev => ev.student._id.toString() === student._id.toString()
+                );
 
-                    if (!finalEvaluations[studentId].evaluations[fieldName]) {
-                        finalEvaluations[studentId].evaluations[fieldName] = currentCriteria;
-                    } else {
-                        // Comparar com o critério anterior e manter o mais avançado
-                        const prevCriteria = finalEvaluations[studentId].evaluations[fieldName];
-                        finalEvaluations[studentId].evaluations[fieldName] =
-                            criteriaOrder.indexOf(currentCriteria) > criteriaOrder.indexOf(prevCriteria)
-                                ? currentCriteria
-                                : prevCriteria;
+                return {
+                    term: term.name,
+                    fields: studentEval
+                        ? studentEval.evaluations.map(ev => ({
+                            fieldName: ev.fieldName,
+                            evaluationCriteria: ev.evaluationCriteria
+                        }))
+                        : []
+                };
+            });
+
+            // ---------- CONSOLIDAÇÃO ANUAL ----------
+            const fieldMap = {};
+
+            gradebook.terms.forEach(term => {
+                const studentEval = term.studentEvaluations.find(
+                    ev => ev.student._id.toString() === student._id.toString()
+                );
+
+                if (!studentEval) return;
+
+                studentEval.evaluations.forEach(ev => {
+                    if (!fieldMap[ev.fieldName]) {
+                        fieldMap[ev.fieldName] = [];
                     }
+                    fieldMap[ev.fieldName].push(ev.evaluationCriteria);
                 });
             });
+
+            const annualEvaluation = Object.keys(fieldMap).map(fieldName => {
+                const criteriaList = fieldMap[fieldName];
+
+                let finalStatus = 'not-yet';
+
+                if (criteriaList.includes('developed')) {
+                    finalStatus = 'developed';
+                } else if (criteriaList.includes('under-development')) {
+                    finalStatus = 'under-development';
+                }
+
+                return {
+                    fieldName,
+                    finalStatus
+                };
+            });
+
+            return {
+                student: {
+                    _id: student._id,
+                    name: student.name
+                },
+                totalAbsences,
+                terms: termsEvaluation,
+                annualEvaluation
+            };
         });
 
-        res.status(200).json({ generalRecord: Object.values(finalEvaluations) });
+        res.status(200).json(learningRecord);
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Erro ao buscar registro geral.', error: error.message });
+        res.status(500).json({ message: 'Internal Server Error' });
     }
 });
 
