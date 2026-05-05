@@ -3,6 +3,7 @@ const router = express.Router();
 const Gradebook = require('../models/gradebook.model');
 const Student = require('../models/student.model');
 const { authenticateToken, sortLessonsInGradebook } = require('../utilities');
+const hasRealGrade = require('../validators');
 
 // 1. Rota que busca um gradebook por ID
 router.get('/:id', authenticateToken, async (req, res) => {
@@ -704,6 +705,101 @@ router.put('/:gradebookId/term/:termId/evaluations', authenticateToken, async (r
     }
 });
 
+//ALTERA NOTA POR NOTA
+// PUT - Salvar avaliação de um único aluno (OTIMIZADO PARA CONEXÕES LENTAS)
+router.put('/:gradebookId/term/:termId/student/:studentId', authenticateToken, async (req, res) => {
+    try {
+        const { gradebookId, termId, studentId } = req.params;
+        const {
+            monthlyExam,
+            bimonthlyExam,
+            qualitativeAssessment,
+            bimonthlyGrade,
+            bimonthlyRecovery,
+            bimonthlyAverage,
+            totalAbsences
+        } = req.body;
+
+        // Buscar a caderneta
+        const gradebook = await Gradebook.findById(gradebookId);
+        if (!gradebook) {
+            return res.status(404).json({ message: 'Caderneta não encontrada' });
+        }
+
+        // Buscar o bimestre
+        const term = gradebook.terms.id(termId);
+        if (!term) {
+            return res.status(404).json({ message: 'Bimestre não encontrado' });
+        }
+
+        // Buscar avaliação existente do aluno
+        let studentEval = term.studentEvaluations.find(
+            ev => ev.student.toString() === studentId
+        );
+
+        // Se não existir, criar nova avaliação
+        if (!studentEval) {
+            // Buscar dados do aluno para criar o objeto
+            const Student = require('../models/student.model');
+            const student = await Student.findById(studentId).select('name cpf');
+
+            if (!student) {
+                return res.status(404).json({ message: 'Aluno não encontrado' });
+            }
+
+            studentEval = {
+                student: studentId,
+                monthlyExam: 0,
+                bimonthlyExam: 0,
+                qualitativeAssessment: 0,
+                bimonthlyGrade: 0,
+                bimonthlyRecovery: 0,
+                bimonthlyAverage: 0,
+                totalAbsences: 0
+            };
+            term.studentEvaluations.push(studentEval);
+            studentEval = term.studentEvaluations[term.studentEvaluations.length - 1];
+        }
+
+        // Atualizar apenas os campos que vieram na requisição
+        if (monthlyExam !== undefined) studentEval.monthlyExam = monthlyExam;
+        if (bimonthlyExam !== undefined) studentEval.bimonthlyExam = bimonthlyExam;
+        if (qualitativeAssessment !== undefined) studentEval.qualitativeAssessment = qualitativeAssessment;
+        if (bimonthlyGrade !== undefined) studentEval.bimonthlyGrade = bimonthlyGrade;
+        if (bimonthlyRecovery !== undefined) studentEval.bimonthlyRecovery = bimonthlyRecovery;
+        if (bimonthlyAverage !== undefined) studentEval.bimonthlyAverage = bimonthlyAverage;
+        if (totalAbsences !== undefined) studentEval.totalAbsences = totalAbsences;
+
+        // Forçar o Mongoose a reconhecer a mudança no array
+        term.markModified('studentEvaluations');
+
+        // Salvar a caderneta
+        await gradebook.save();
+
+        // Retornar a avaliação atualizada
+        res.status(200).json({
+            message: 'Avaliação do aluno salva com sucesso',
+            studentEvaluation: {
+                student: {
+                    _id: studentId,
+                    name: studentEval.student.name || 'Carregando...'
+                },
+                monthlyExam: studentEval.monthlyExam,
+                bimonthlyExam: studentEval.bimonthlyExam,
+                qualitativeAssessment: studentEval.qualitativeAssessment,
+                bimonthlyGrade: studentEval.bimonthlyGrade,
+                bimonthlyRecovery: studentEval.bimonthlyRecovery,
+                bimonthlyAverage: studentEval.bimonthlyAverage,
+                totalAbsences: studentEval.totalAbsences
+            }
+        });
+
+    } catch (error) {
+        console.error('Erro ao salvar avaliação do aluno:', error);
+        res.status(500).json({ message: 'Erro interno ao salvar avaliação' });
+    }
+});
+
 //REGISTRO GERAL
 router.get('/:gradebookId/learning-record', authenticateToken, async (req, res) => {
     try {
@@ -756,14 +852,21 @@ router.get('/:gradebookId/learning-record', authenticateToken, async (req, res) 
                 );
                 return {
                     term: term.name,
-                    average: evaluation ? evaluation.bimonthlyAverage || 0 : 0,
+                    average: hasRealGrade(evaluation)
+                        ? evaluation.bimonthlyAverage
+                        : null,
                 };
             });
 
             // ---------- MÉDIA ANUAL ----------
+            const validAverages = bimonthlyAverages
+                .map(b => b.average)
+                .filter(avg => avg !== null);
+
             const annualAverage =
-                bimonthlyAverages.reduce((sum, b) => sum + b.average, 0) /
-                (bimonthlyAverages.length || 1);
+                validAverages.length > 0
+                    ? validAverages.reduce((sum, avg) => sum + avg, 0) / validAverages.length
+                    : 0;
 
             // ---------- RECUPERAÇÃO FINAL E MÉDIA FINAL ----------
             // Achar avaliação de qualquer um dos termos (todas têm os mesmos dados do aluno)
@@ -793,6 +896,16 @@ router.get('/:gradebookId/learning-record', authenticateToken, async (req, res) 
                 totalAbsences,
             };
         });
+
+        // console.log(JSON.stringify(
+        //     gradebook.terms.map(t => ({
+        //         term: t.name,
+        //         evaluations: t.studentEvaluations.map(ev => ({
+        //             student: ev.student?.toString(),
+        //             avg: ev.bimonthlyAverage
+        //         }))
+        //     }))), null, 2
+        // );
 
         res.status(200).json(learningRecord);
     } catch (error) {
