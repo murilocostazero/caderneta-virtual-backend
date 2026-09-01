@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Gradebook = require('../models/gradebook.model');
 const Student = require('../models/student.model');
+const User = require('../models/user.model');
 const { authenticateToken, sortLessonsInGradebook } = require('../utilities');
 const hasRealGrade = require('../validators');
 
@@ -447,6 +448,108 @@ router.post('/:gradebookId/term/:termId/lesson/:lessonId/attendance', authentica
         res.status(201).json({ message: 'Chamada criada com sucesso', gradebook });
     } catch (err) {
         res.status(500).json({ message: err.message });
+    }
+});
+
+// Rota para transferir cadernetas de um professor para outro
+router.put('/transfer/:gradebookId', authenticateToken, async (req, res) => {
+    try {
+        const { gradebookId } = req.params;
+        const { newTeacherId } = req.body;
+
+        // Validação básica
+        if (!newTeacherId) {
+            return res.status(400).json({ 
+                message: 'O ID do novo professor é obrigatório.' 
+            });
+        }
+
+        // Busca a caderneta com todos os dados populados
+        const gradebook = await Gradebook.findById(gradebookId)
+            .populate('teacher', 'name email userType')
+            .populate('subject', 'name')
+            .populate('classroom', 'classroomType grade name shift')
+            .populate('school', '_id name')
+            .populate('terms.studentEvaluations.student', 'name cpf');
+
+        if (!gradebook) {
+            return res.status(404).json({ message: 'Caderneta não encontrada.' });
+        }
+
+        // Verifica se o novo professor existe e é válido
+        const newTeacher = await User.findById(newTeacherId);
+        if (!newTeacher) {
+            return res.status(404).json({ message: 'Professor não encontrado.' });
+        }
+
+        // // Verifica se o novo professor é do tipo 'teacher'
+        // if (newTeacher.userType !== 'teacher') {
+        //     return res.status(400).json({ 
+        //         message: 'O usuário selecionado não é um professor.' 
+        //     });
+        // }
+
+        // Verifica se o novo professor pertence à mesma escola
+        if (newTeacher.lastSelectedSchool?.toString() !== gradebook.school._id.toString()) {
+            return res.status(400).json({ 
+                message: 'O novo professor não pertence à mesma escola.' 
+            });
+        }
+
+        // Guarda informações do professor antigo para o histórico
+        const oldTeacher = {
+            _id: gradebook.teacher._id,
+            name: gradebook.teacher.name,
+            email: gradebook.teacher.email
+        };
+
+        // Atualiza o professor na caderneta
+        gradebook.teacher = newTeacherId;
+
+        // Adiciona um log de transferência (opcional - se você quiser manter histórico)
+        // Você pode adicionar um campo transferHistory no schema se desejar
+        // gradebook.transferHistory = gradebook.transferHistory || [];
+        // gradebook.transferHistory.push({
+        //     fromTeacher: oldTeacher._id,
+        //     toTeacher: newTeacherId,
+        //     transferredAt: new Date(),
+        //     transferredBy: req.user.id
+        // });
+
+        // Salva a caderneta atualizada
+        await gradebook.save();
+
+        // Busca a caderneta atualizada com todos os populates
+        const updatedGradebook = await Gradebook.findById(gradebookId)
+            .populate('teacher', 'name email userType')
+            .populate('subject', 'name')
+            .populate('classroom', 'classroomType grade name shift')
+            .populate('school', '_id name')
+            .populate('terms.studentEvaluations.student', 'name cpf');
+
+        sortLessonsInGradebook(updatedGradebook);
+
+        // Retorna sucesso com os dados atualizados
+        res.status(200).json({
+            message: 'Caderneta transferida com sucesso!',
+            gradebook: updatedGradebook,
+            transferDetails: {
+                fromTeacher: oldTeacher,
+                toTeacher: {
+                    _id: newTeacher._id,
+                    name: newTeacher.name,
+                    email: newTeacher.email
+                },
+                transferredAt: new Date()
+            }
+        });
+
+    } catch (error) {
+        console.error('Erro ao transferir caderneta:', error);
+        res.status(500).json({ 
+            message: 'Erro ao transferir caderneta.', 
+            error: error.message 
+        });
     }
 });
 
